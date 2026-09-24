@@ -1454,10 +1454,22 @@ type ListContractsParams struct {
 
 	// Tag Show only contracts carrying this tag.
 	Tag *TagParam `form:"tag,omitempty" json:"tag,omitempty"`
+
+	// Sort Column to sort by. Defaults to id when omitted or unknown.
+	Sort *ListContractsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Dir Sort direction. Defaults to asc when omitted.
+	Dir *ListContractsParamsDir `form:"dir,omitempty" json:"dir,omitempty"`
 }
 
 // ListContractsParamsNetwork defines parameters for ListContracts.
 type ListContractsParamsNetwork string
+
+// ListContractsParamsSort defines parameters for ListContracts.
+type ListContractsParamsSort string
+
+// ListContractsParamsDir defines parameters for ListContracts.
+type ListContractsParamsDir string
 
 // RegisterContractJSONBody defines parameters for RegisterContract.
 type RegisterContractJSONBody struct {
@@ -4620,6 +4632,38 @@ func NewListContractsRequest(server string, params *ListContractsParams) (*http.
 		if params.Tag != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "tag", runtime.ParamLocationQuery, *params.Tag); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sort != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sort", runtime.ParamLocationQuery, *params.Sort); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Dir != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "dir", runtime.ParamLocationQuery, *params.Dir); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err

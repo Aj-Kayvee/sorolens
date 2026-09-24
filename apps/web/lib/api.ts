@@ -110,6 +110,8 @@ export function listContracts(params?: {
   network?: string;
   status?: string;
   tag?: string;
+  sort?: string;
+  dir?: "asc" | "desc";
 }): Promise<ContractsListResponse> {
   const search = new URLSearchParams();
   if (params?.cursor) search.set("cursor", params.cursor);
@@ -117,6 +119,8 @@ export function listContracts(params?: {
   if (params?.network) search.set("network", params.network);
   if (params?.status) search.set("status", params.status);
   if (params?.tag) search.set("tag", params.tag);
+  if (params?.sort) search.set("sort", params.sort);
+  if (params?.dir) search.set("dir", params.dir);
   const qs = search.toString();
   return fetchJson<ContractsListResponse>(
     `${API_URL}/api/v1/contracts${qs ? "?" + qs : ""}`

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DataTable, Toast } from "@sorolens/ui";
 import type { Column } from "@sorolens/ui";
 import { LabelledId } from "@/components/LabelledId";
@@ -19,6 +20,14 @@ import ImportContractsCsv from "@/components/ImportContractsCsv";
 // ---------------------------------------------------------------------------
 
 const PAGE_SIZE = 20;
+
+// Sort is stored in the URL (?sort=&dir=) so it is shareable (#175). Column
+// keys must match the backend's whitelist (id, label, network, status,
+// added_at).
+const SORT_PARAM = "sort";
+const DIR_PARAM = "dir";
+const DEFAULT_SORT_COLUMN = "added_at";
+const DEFAULT_SORT_DIRECTION = "desc" as const;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -178,9 +187,35 @@ function makeColumns(onTagClick: (tag: string) => void): Column<ContractRow>[] {
 // ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
+
+// useSearchParams must sit behind a Suspense boundary during static
+// prerendering, so the page is split into a Suspense wrapper and the
+// component that actually reads the URL.
 export default function ContractsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ContractsPageInner />
+    </Suspense>
+  );
+}
+
+function ContractsPageInner() {
   // Selected network from the header selector.
   const { network } = useNetwork();
+
+  // Sort state is derived from the URL and written back on change, so a
+  // sorted view is shareable via its query string (#175).
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [sortColumn, setSortColumn] = useState<string>(
+    () => searchParams?.get(SORT_PARAM) ?? DEFAULT_SORT_COLUMN,
+  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
+    () =>
+      searchParams?.get(DIR_PARAM) === "asc"
+        ? "asc"
+        : DEFAULT_SORT_DIRECTION,
+  );
 
   // Data state
   const [contracts, setContracts] = useState<ContractRow[]>([]);
@@ -196,10 +231,6 @@ export default function ContractsPage() {
 
   // Tag filter state (server-side, combined with the network filter)
   const [tagFilter, setTagFilter] = useState("");
-
-  // Sort state
-  const [sortColumn, setSortColumn] = useState<string>("added_at");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // CSV import state
   const [showImport, setShowImport] = useState(false);
@@ -230,6 +261,8 @@ export default function ContractsPage() {
           limit: PAGE_SIZE,
           network: networkFilter(network),
           tag: tagFilter || undefined,
+          sort: sortColumn,
+          dir: sortDirection,
         });
         if (seq !== loadSeq.current) return;
         setContracts(data.contracts ?? []);
@@ -244,7 +277,7 @@ export default function ContractsPage() {
         if (seq === loadSeq.current) setLoading(false);
       }
     },
-    [network, tagFilter]
+    [network, tagFilter, sortColumn, sortDirection],
   );
 
   useEffect(() => {
@@ -265,6 +298,34 @@ export default function ContractsPage() {
       setCursorIndex(0);
     }
   }, [network, tagFilter]);
+
+  // Reset to the first page when the sort changes, because an in-flight
+  // cursor was produced in the previous order and no longer points at the
+  // next page under the new sort.
+  const prevSort = useRef(`${sortColumn}:${sortDirection}`);
+  useEffect(() => {
+    const key = `${sortColumn}:${sortDirection}`;
+    if (prevSort.current !== key) {
+      prevSort.current = key;
+      setCursors([null]);
+      setCursorIndex(0);
+    }
+  }, [sortColumn, sortDirection]);
+
+  // Mirror the active sort into the URL so the view is shareable. The guard
+  // only writes when the URL differs, so visiting /contracts without sort
+  // params does not rewrite the URL on mount.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    const current =
+      params.get(SORT_PARAM) ?? DEFAULT_SORT_COLUMN;
+    const currentDir =
+      params.get(DIR_PARAM) === "asc" ? "asc" : DEFAULT_SORT_DIRECTION;
+    if (current === sortColumn && currentDir === sortDirection) return;
+    params.set(SORT_PARAM, sortColumn);
+    params.set(DIR_PARAM, sortDirection);
+    router.replace(`?${params.toString()}`);
+  }, [sortColumn, sortDirection, router, searchParams]);
 
   // ---------------------------------------------------------------------------
   // Pagination handlers

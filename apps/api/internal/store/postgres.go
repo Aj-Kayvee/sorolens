@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -93,14 +94,27 @@ func (s *postgresStore) GetContract(ctx context.Context, contractID string) (Con
 	return c, nil
 }
 
-// ListContracts returns a list of contracts matching the optional filters,
-// ordered by ID. The cursor is the last-seen contract ID (lexicographic order).
+// ListContracts returns a list of contracts matching the optional filters.
+// The default order is by ID; a sort column and direction from
+// ContractFilters may override it. The cursor is the last-seen contract ID,
+// and id is always appended as a stable tie-breaker.
 func (s *postgresStore) ListContracts(ctx context.Context, cursor string, limit int, f ContractFilters) ([]Contract, string, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	// cursor is the last-seen contract ID (lexicographic order).
-	rows, err := s.pool.Query(ctx, `
+	// Only whitelisted values (see contractSortColumns) reach the ORDER BY
+	// clause, so the human-supplied sort parameter cannot inject SQL.
+	sortCol, ok := contractSortColumns[f.Sort]
+	if !ok {
+		sortCol = "id"
+	}
+	dir := "ASC"
+	if strings.EqualFold(f.SortDir, "desc") {
+		dir = "DESC"
+	}
+	// cursor is the last-seen contract ID (lexicographic order); id is always
+	// appended as a stable tie-breaker.
+	rows, err := s.pool.Query(ctx, fmt.Sprintf(`
 		SELECT c.id, c.network, c.label, c.wasm_hash, c.created_at_ledger,
 		       c.backfill_complete_at, c.status, c.added_at, activity.last_activity_at
 		FROM contracts c
@@ -116,8 +130,8 @@ func (s *postgresStore) ListContracts(ctx context.Context, cursor string, limit 
 		WHERE ($1 = '' OR c.id > $1)
 		  AND ($2 = '' OR c.network = $2)
 		  AND ($3 = '' OR c.status = $3)
-		ORDER BY c.id ASC
-		LIMIT $4`, cursor, f.Network, f.Status, limit+1)
+		ORDER BY c.%s %s, c.id ASC
+		LIMIT $4`, sortCol, dir), cursor, f.Network, f.Status, limit+1)
 	if err != nil {
 		return nil, "", err
 	}

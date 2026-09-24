@@ -35,6 +35,32 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// ── Mock next/navigation ────────────────────────────────────────────────────
+// router.replace() updates the shared search params, so the component re-reads
+// the new sort state on the next render just as a real navigation would.
+const nav = vi.hoisted(() => {
+  let query = new URLSearchParams("");
+  const replace = vi.fn((href: string) => {
+    query = new URLSearchParams(
+      href.startsWith("?") ? href.slice(1) : href,
+    );
+  });
+  const push = vi.fn();
+  return {
+    replace,
+    push,
+    getQuery: () => query,
+    setQuery: (q: string | URLSearchParams) => {
+      query = new URLSearchParams(q);
+    },
+  };
+});
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: nav.replace, push: nav.push }),
+  useSearchParams: () => nav.getQuery(),
+}));
+
 // ── Mock @sorolens/ui so we don't need the built dist ───────────────────────
 vi.mock("@sorolens/ui", () => ({
   Toast: ({ message }: { message: string }) => (
@@ -47,23 +73,52 @@ vi.mock("@sorolens/ui", () => ({
     loading,
     emptyState,
     onRowClick,
+    onSort,
+    sortColumn,
+    sortDirection,
   }: {
     data: T[];
     columns: {
       key: string;
-      header: string;
+      header: React.ReactNode;
+      sortable?: boolean;
       accessor?: (item: T) => React.ReactNode;
     }[];
     rowKey: (item: T) => string;
     loading?: boolean;
     emptyState?: React.ReactNode;
     onRowClick?: (item: T) => void;
+    onSort?: (columnKey: string) => void;
+    sortColumn?: string;
+    sortDirection?: "asc" | "desc";
   }) => {
     if (loading) return <div data-testid="data-table-loading">loading</div>;
     if (data.length === 0)
       return <div data-testid="data-table-empty">{emptyState}</div>;
     return (
       <table data-testid="data-table">
+        <thead>
+          <tr>
+            {columns.map((col) => (
+              <th
+                key={col.key}
+                data-testid={`col-${col.key}`}
+                onClick={() => col.sortable && onSort?.(col.key)}
+              >
+                {col.header}
+                {col.sortable && (
+                  <span>
+                    {sortColumn === col.key
+                      ? sortDirection === "asc"
+                        ? "▲"
+                        : "▼"
+                      : "↕"}
+                  </span>
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
         <tbody>
           {data.map((item) => (
             <tr
@@ -157,6 +212,7 @@ function rowTexts(): string[] {
 describe("ContractsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    nav.setQuery("");
     mockListContracts.mockResolvedValue({
       contracts: [CONTRACT_A, CONTRACT_B],
       cursor: null,
@@ -384,5 +440,68 @@ describe("ContractsPage", () => {
 
     expect(screen.getByText("prod")).toBeDefined();
     expect(screen.getByText("defi")).toBeDefined();
+  });
+
+  // ── Sorting: header click toggles asc/desc, sort lives in the URL ────────
+
+  it("sorts ascending on first click of a new column and mirrors it in the URL", async () => {
+    await renderPage();
+    await waitFor(() => screen.getByTestId("data-table"));
+    nav.replace.mockClear();
+
+    fireEvent.click(screen.getByTestId("col-label"));
+
+    // The page refetches with the new sort against the API…
+    await waitFor(() =>
+      expect(mockListContracts).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: "label", dir: "asc" }),
+      ),
+    );
+    // …and the active sort is written to the URL so the view is shareable.
+    expect(nav.replace).toHaveBeenCalledWith("?sort=label&dir=asc");
+    // The visual indicator is rendered for the active sort column.
+    expect(screen.getByText("▲")).toBeDefined();
+  });
+
+  it("toggles to descending on a second click of the same column", async () => {
+    await renderPage();
+    await waitFor(() => screen.getByTestId("data-table"));
+    nav.replace.mockClear();
+
+    // First click on the default column (added_at, desc) flips to asc.
+    fireEvent.click(screen.getByTestId("col-added_at"));
+    await waitFor(() =>
+      expect(nav.replace).toHaveBeenCalledWith("?sort=added_at&dir=asc"),
+    );
+
+    // Second click flips back to desc.
+    fireEvent.click(screen.getByTestId("col-added_at"));
+    await waitFor(() =>
+      expect(nav.replace).toHaveBeenCalledWith("?sort=added_at&dir=desc"),
+    );
+    expect(screen.getByText("▼")).toBeDefined();
+  });
+
+  it("initializes the sort from the URL on load", async () => {
+    nav.setQuery("?sort=status&dir=asc");
+
+    await renderPage();
+    await waitFor(() => screen.getByTestId("data-table"));
+
+    // The first request already carries the URL sort params.
+    expect(mockListContracts).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: "status", dir: "asc" }),
+    );
+    // A URL that already matches the state is not rewritten.
+    expect(nav.replace).not.toHaveBeenCalled();
+    expect(screen.getByText("▲")).toBeDefined();
+  });
+
+  it("does not rewrite the URL for the default sort", async () => {
+    await renderPage();
+    await waitFor(() => screen.getByTestId("data-table"));
+
+    // Visiting /contracts without sort params keeps the URL untouched.
+    expect(nav.replace).not.toHaveBeenCalled();
   });
 });
