@@ -41,6 +41,8 @@ type MockStore struct {
 	UpsertContractErr           error
 	GetContractErr              error
 	ListContractsErr            error
+	DeleteContractsErr          error
+	SetContractLabelErr         error
 	GetGlobalStatsErr           error
 	ListEventsErr               error
 	ListInvocationsErr          error
@@ -68,7 +70,10 @@ type MockStore struct {
 
 func (m *MockStore) UpsertLabel(_ context.Context, label Label) error {
 	for i, existing := range m.labels {
-		if existing.Label == label.Label && (label.Public || existing.WorkspaceID == label.WorkspaceID) { m.labels[i] = label; return nil }
+		if existing.Label == label.Label && (label.Public || existing.WorkspaceID == label.WorkspaceID) {
+			m.labels[i] = label
+			return nil
+		}
 	}
 	m.labels = append(m.labels, label)
 	return nil
@@ -78,15 +83,27 @@ func (m *MockStore) ListLabels(_ context.Context, workspaceID, query string) ([]
 	query = strings.ToLower(query)
 	var out []Label
 	for _, label := range m.labels {
-		if !label.Public && label.WorkspaceID != workspaceID { continue }
-		if query == "" || strings.Contains(strings.ToLower(label.Label), query) || strings.Contains(strings.ToLower(label.Value), query) { out = append(out, label) }
+		if !label.Public && label.WorkspaceID != workspaceID {
+			continue
+		}
+		if query == "" || strings.Contains(strings.ToLower(label.Label), query) || strings.Contains(strings.ToLower(label.Value), query) {
+			out = append(out, label)
+		}
 	}
 	return out, nil
 }
 
 func (m *MockStore) ResolveLabel(_ context.Context, workspaceID, query string) (Label, error) {
-	for _, label := range m.labels { if label.Public && strings.EqualFold(label.Label, query) { return label, nil } }
-	for _, label := range m.labels { if !label.Public && label.WorkspaceID == workspaceID && strings.EqualFold(label.Label, query) { return label, nil } }
+	for _, label := range m.labels {
+		if label.Public && strings.EqualFold(label.Label, query) {
+			return label, nil
+		}
+	}
+	for _, label := range m.labels {
+		if !label.Public && label.WorkspaceID == workspaceID && strings.EqualFold(label.Label, query) {
+			return label, nil
+		}
+	}
 	return Label{}, ErrNotFound
 }
 
@@ -175,6 +192,68 @@ func (m *MockStore) tagsFor(contractID string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// filterOut returns items with every element for which drop returns true
+// removed, reusing the backing array.
+func filterOut[T any](items []T, drop func(T) bool) []T {
+	out := items[:0]
+	for _, item := range items {
+		if !drop(item) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func (m *MockStore) DeleteContracts(_ context.Context, ids []string) (int64, error) {
+	if m.DeleteContractsErr != nil {
+		return 0, m.DeleteContractsErr
+	}
+	removed := make(map[string]bool, len(ids))
+	var deleted int64
+	for _, id := range ids {
+		if _, ok := m.contracts[id]; !ok {
+			continue
+		}
+		delete(m.contracts, id)
+		removed[id] = true
+		deleted++
+	}
+	if deleted == 0 {
+		return 0, nil
+	}
+	// Mirror the postgres transaction: drop every row that referenced the
+	// untracked contracts.
+	m.events = filterOut(m.events, func(e Event) bool { return removed[e.ContractID] })
+	m.invocations = filterOut(m.invocations, func(i Invocation) bool { return removed[i.ContractID] })
+	m.storageEntries = filterOut(m.storageEntries, func(se StorageEntry) bool { return removed[se.ContractID] })
+	m.contractUpgrades = filterOut(m.contractUpgrades, func(u ContractUpgrade) bool { return removed[u.ContractID] })
+	for id := range removed {
+		delete(m.syncStates, id)
+		delete(m.healthScores, id)
+		for _, items := range m.watchlist {
+			delete(items, id)
+		}
+	}
+	return deleted, nil
+}
+
+func (m *MockStore) SetContractLabel(_ context.Context, ids []string, label string) (int64, error) {
+	if m.SetContractLabelErr != nil {
+		return 0, m.SetContractLabelErr
+	}
+	var updated int64
+	for _, id := range ids {
+		c, ok := m.contracts[id]
+		if !ok {
+			continue
+		}
+		c.Label = label
+		m.contracts[id] = c
+		updated++
+	}
+	return updated, nil
 }
 
 func (m *MockStore) BatchInsertEvents(_ context.Context, events []Event) error {
