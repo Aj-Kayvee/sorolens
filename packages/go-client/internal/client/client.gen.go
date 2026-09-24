@@ -1455,10 +1455,10 @@ type ListContractsParams struct {
 	// Tag Show only contracts carrying this tag.
 	Tag *TagParam `form:"tag,omitempty" json:"tag,omitempty"`
 
-	// Sort Column to sort by. Defaults to id when omitted or unknown.
+	// Sort Column to sort by. Defaults to id when omitted; values outside the enum are rejected with 422.
 	Sort *ListContractsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 
-	// Dir Sort direction. Defaults to asc when omitted.
+	// Dir Sort direction. Defaults to asc when omitted; values outside the enum are rejected with 422.
 	Dir *ListContractsParamsDir `form:"dir,omitempty" json:"dir,omitempty"`
 }
 

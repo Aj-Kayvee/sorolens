@@ -356,8 +356,8 @@ List all tracked contracts.
 
 **Query params:** `network` (filter by network), `status` (filter by status),
 `tag` (show only contracts carrying this tag), `sort` (sort column: `id`, `label`,
-`network`, `status`, or `added_at`; unknown values fall back to `id`),
-`dir` (`asc` or `desc`, default `asc`).
+`network`, `status`, or `added_at`; defaults to `id`), `dir` (`asc` or `desc`,
+default `asc`). Values outside those sets are rejected with `422`.
 
 **Response `200`:**
 ```json
