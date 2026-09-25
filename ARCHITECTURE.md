@@ -333,6 +333,16 @@ All routes return `Content-Type: application/json`. Errors follow:
 { "error": "human readable message", "code": "ERROR_CODE" }
 ```
 
+Request bodies are capped at 1 MiB by default. A request whose
+`Content-Length` exceeds the cap is rejected before its body is read, and any
+other body is bounded with `http.MaxBytesReader`; both paths return `413` with:
+
+```json
+{ "error": { "code": "PAYLOAD_TOO_LARGE", "message": "request body exceeds the 1048576 byte limit", "request_id": "..." } }
+```
+
+Set `REQUEST_MAX_BODY_BYTES` to change the cap.
+
 Cursor pagination uses an opaque `cursor` token (base64 of `{ledger}:{id}`) rather than offset. This is safe against inserts during pagination and aligns with how the RPC itself paginates.
 
 #### Authentication and scopes

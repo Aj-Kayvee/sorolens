@@ -14,7 +14,9 @@ import (
 )
 
 // New builds and returns the HTTP router with all middleware and routes wired.
-func New(h *handler.Handler) http.Handler {
+// maxBodyBytes caps the request body size in bytes; values of zero or less
+// disable the limit. Callers normally pass cfg.RequestMaxBodyBytes.
+func New(h *handler.Handler, maxBodyBytes int64) http.Handler {
 	r := chi.NewRouter()
 
 	// Global middleware
@@ -23,6 +25,7 @@ func New(h *handler.Handler) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.CORS)
 	r.Use(middleware.Recoverer(h.Logger))
+	r.Use(middleware.BodyLimit(maxBodyBytes))
 	r.Use(middleware.Logger(h.Logger))
 	r.Use(chiMiddleware.StripSlashes)
 

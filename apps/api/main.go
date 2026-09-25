@@ -71,7 +71,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),
-		Handler:      router.New(h),
+		Handler:      router.New(h, cfg.RequestMaxBodyBytes),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
