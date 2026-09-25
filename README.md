@@ -152,6 +152,7 @@ Admin: `GAZ3HN2QNDKWLOI2OQEG65KBJEAUP4PROR3FJNXNDY34UH547MN4CJUI`
 | XDR decoder | TypeScript package (`packages/xdr`), wraps `@stellar/stellar-sdk` |
 | CLI | Go 1.23, cobra |
 | Go client | Generated from [`docs/openapi.yaml`](docs/openapi.yaml) into `packages/go-client` |
+| Python client | Generated from [`docs/openapi.yaml`](docs/openapi.yaml) into `packages/python-sdk` (sync + async, published to PyPI as `sorolens`) |
 | Fixture contract | Rust (stable), Soroban SDK, deployed to Stellar testnet |
 | Watchdog contract | Rust (stable), Soroban SDK, on-chain health tracking (`contracts/watchdog`) |
 ---
@@ -167,6 +168,7 @@ sorolens/
     xdr/          TypeScript XDR decoder
     ui/           Shared React UI primitives
     go-client/    Auto-generated Go API client (from docs/openapi.yaml)
+    python-sdk/   Official Python API client, sync + async (from docs/openapi.yaml)
   cli/            Go CLI (cobra)
   contracts/
     counter/      Rust Soroban fixture contract
@@ -174,6 +176,24 @@ sorolens/
   docs/
     screenshots/  Screenshot placeholders
 ```
+
+### Python SDK
+
+[`packages/python-sdk`](./packages/python-sdk) ships the official `sorolens` Python client: a generated
+low-level layer built from [`docs/openapi.yaml`](docs/openapi.yaml) plus a hand-written facade with sync
+and async transports.
+
+```python
+from sorolens import Client
+
+with Client(api_key="sk_live_...") as client:
+    print(client.stats.global_stats().tracked_contracts)
+    for contract in client.contracts.list(limit=10).contracts:
+        print(contract.id, contract.status)
+```
+
+See [`packages/python-sdk/README.md`](./packages/python-sdk/README.md) for the quickstart, API reference
+and release process.
 
 ### The watchdog vertical
 
