@@ -31,6 +31,7 @@ type MockStore struct {
 	indexerCursors     map[string]uint32
 	contractVersions   map[string][]ContractVersion
 	alertGroups        []AlertGroup
+	labels             []Label
 
 	// Error injection
 	UpsertContractErr           error
