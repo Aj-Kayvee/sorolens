@@ -43,6 +43,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               >
                 Playground
               </Link>
+              <Link
+                href="/settings"
+                className="text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
+              >
+                Settings
+              </Link>
             </nav>
             <NetworkSelector />
             <ThemeToggle />
