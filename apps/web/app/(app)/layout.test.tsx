@@ -21,6 +21,10 @@ vi.mock("@/components/NetworkSelector", () => ({
   NetworkSelector: () => <div data-testid="network-selector" />,
 }));
 
+vi.mock("@/components/ThemeToggle", () => ({
+  ThemeToggle: () => <div data-testid="theme-toggle" />,
+}));
+
 describe("AppLayout", () => {
   afterEach(() => {
     cleanup();

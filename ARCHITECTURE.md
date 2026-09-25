@@ -840,3 +840,43 @@ Upstash Redis is used because it is serverless (no idle cost), has a free tier, 
 - Postgres `WHERE (ledger, id) < (cursor_ledger, cursor_id) ORDER BY ledger DESC, id DESC LIMIT N` uses the composite index efficiently.
 
 **Tradeoff:** Clients cannot jump to an arbitrary page number. This is acceptable for an observability dashboard where users scroll through a feed; it is not a spreadsheet export use case.
+
+---
+
+### 5.5 PWA / Web Push (issue #275)
+
+**Decision:** Ship installability and push-notification delivery as a Progressive Web App (Workbox service worker + VAPID Web Push) rather than a native mobile wrapper.
+
+**Rationale:** A PWA requires no App Store review cycle, works on all major mobile browsers, and can be maintained purely within the existing Next.js codebase. VAPID push is the W3C standard supported natively by all modern browsers and does not require any cloud push SDK.
+
+**New API surface** (Next.js App Router route handlers in `apps/web/app/api/push/`):
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET`  | `/api/push/vapid-public-key` | Returns the VAPID public key for `PushManager.subscribe()`. Public by design. |
+| `POST` | `/api/push/subscribe`        | Saves a `PushSubscription` JSON blob (endpoint + keys) to the server-side store. |
+| `DELETE`| `/api/push/subscribe`       | Removes a subscription by endpoint. |
+| `PUT`  | `/api/push/subscribe`        | Internal endpoint: fans out a push payload to all stored subscriptions. Auth-guarded by `PUSH_INTERNAL_SECRET`. |
+
+**Environment variables** (server-side only — never `NEXT_PUBLIC_*`):
+
+| Variable | Purpose |
+|----------|---------|
+| `VAPID_PUBLIC_KEY`   | Base64url-encoded EC P-256 public key |
+| `VAPID_PRIVATE_KEY`  | Base64url-encoded EC P-256 private key |
+| `VAPID_SUBJECT`      | Contact URI for the VAPID JWT (`mailto:` or `https:`) |
+| `PUSH_INTERNAL_SECRET` | Shared secret for the `PUT` push-send endpoint |
+
+**#127 dependency:** Issue #127 ("pluggable notification channels") specifies Slack/Discord/PagerDuty integrations, not Web Push. The server-side alert-triggered push path is **stubbed** — the `PUT /api/push/subscribe` route exists and works, but the indexer/notifier does not yet call it. When #127 or a dedicated push-delivery issue lands, the notifier should call `PUT /api/push/subscribe` with `x-push-secret: $PUSH_INTERNAL_SECRET` when a Critical alert fires. This is documented in `apps/web/app/api/push/subscribe/route.ts`.
+
+**Subscription persistence:** The current `POST /api/push/subscribe` stores subscriptions in-process (a `Map`). This is lost on serverless cold starts. Before enabling push in production, replace the `Map` with a Postgres table (a simple `push_subscriptions(endpoint TEXT PK, keys JSONB, created_at TIMESTAMPTZ)` suffices) and call the Go API to persist it.
+
+**Client-side PWA components:**
+- `apps/web/public/manifest.webmanifest` — Web App Manifest with icons, shortcuts, and `display: standalone`.
+- `apps/web/next.config.ts` — wraps Next.js with `@ducanh2912/next-pwa` (Workbox) to generate a service worker that precaches the app shell and runtime-caches API responses (stale-while-revalidate, 5-minute TTL).
+- `apps/web/lib/alertQueue.ts` — IndexedDB-backed offline alert queue (via `idb`).
+- `apps/web/hooks/useOfflineAlertQueue.ts` — React hook that reads/writes the queue and tracks `navigator.onLine`.
+- `apps/web/hooks/usePushSubscription.ts` — React hook managing the push subscription lifecycle (idle → subscribing → subscribed → denied).
+- `apps/web/components/OfflineAlert.tsx` — `OfflineBanner` (shown when offline) + `OfflineAlertPanel` (the `/offline-alerts` page body).
+- `apps/web/app/offline-alerts/page.tsx` — dedicated page for the queued-alert view.
+

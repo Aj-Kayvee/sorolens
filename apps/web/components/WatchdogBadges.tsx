@@ -101,7 +101,7 @@ interface UptimeBadgeProps {
  * While the value is loading, a skeleton placeholder is shown instead.
  */
 export function UptimeBadge({ window, pct }: UptimeBadgeProps) {
-  if (pct === null) {
+  if (pct == null) {
     return (
       <span className="inline-flex items-center rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-medium text-[var(--color-text-secondary)] animate-pulse">
         {window} —

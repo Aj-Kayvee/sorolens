@@ -1515,25 +1515,14 @@ paths:
           schema:
             type: string
             enum: [24h, 7d, 30d]
-            default: 24h
-          description: Time window for uptime calculation (default 24h).
+          description: Time window over which to compute uptime (default 24h).
       responses:
         "200":
-          description: Uptime result
+          description: Uptime statistics for the specified window
           content:
             application/json:
               schema:
-                type: object
-                required: [contract_id, window, uptime_pct]
-                properties:
-                  contract_id:
-                    type: string
-                  window:
-                    type: string
-                  uptime_pct:
-                    type: number
-                    format: double
-                    description: Percentage of checks with Healthy status (0–100).
+                $ref: "#/components/schemas/UptimeResult"
         "422":
           $ref: "#/components/responses/InvalidInput"
         "500":

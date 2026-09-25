@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 import { NavigationProgress } from "@/components/NavigationProgress";
@@ -29,6 +29,10 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://sorolens.dev",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#7c3aed",
 };
 
 export default function RootLayout({

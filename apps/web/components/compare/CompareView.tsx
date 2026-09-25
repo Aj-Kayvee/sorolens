@@ -54,7 +54,7 @@ export function CompareView({ initialIds, initialWindow }: CompareViewProps) {
     const params = new URLSearchParams();
     if (selectedIds.length > 0) params.set("ids", selectedIds.join(","));
     if (timeWindow !== "7d") params.set("window", timeWindow);
-    const qs = params.toString();
+    const qs = params.toString().replace(/%2C/g, ",");
     router.replace(qs ? `/compare?${qs}` : "/compare", { scroll: false });
   }, [selectedIds, timeWindow, router]);
 

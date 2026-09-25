@@ -1,13 +1,22 @@
-import { ThemeToggle } from "@/components/ThemeToggle";
+"use client";
+
+/**
+ * App-shell layout for all dashboard routes (/(app)/...).
+ *
+ * - Mounts useOfflineAlertQueue so alerts can be captured while offline.
+ * - Renders OfflineBanner at the top when offline.
+ * - Renders PushSubscribeButton in the header so the user can opt in to
+ *   Web Push at any time.
+ */
 import Link from "next/link";
 import { NetworkProvider } from "@/lib/network";
 import { NetworkSelector } from "@/components/NetworkSelector";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { CmdkSearch } from "@/components/CmdkSearch";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <NetworkProvider>
+    <>
+      <OfflineBanner isOffline={isOffline} pendingCount={pending.length} />
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <Link
@@ -51,6 +60,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
             </nav>
             <NetworkSelector />
+            <PushSubscribeButton />
             <ThemeToggle />
           </div>
         </header>
@@ -60,6 +70,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           Built for the Stellar developer community.
         </footer>
       </div>
+    </>
+  );
+}
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <NetworkProvider>
+      <AppLayoutInner>{children}</AppLayoutInner>
     </NetworkProvider>
   );
 }

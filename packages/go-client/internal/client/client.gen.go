@@ -102,6 +102,13 @@ const (
 	Ephemeral SlackMessageResponseType = "ephemeral"
 )
 
+// Defines values for UptimeResultWindow.
+const (
+	UptimeResultWindowN24h UptimeResultWindow = "24h"
+	UptimeResultWindowN30d UptimeResultWindow = "30d"
+	UptimeResultWindowN7d  UptimeResultWindow = "7d"
+)
+
 // Defines values for NetworkParam.
 const (
 	NetworkParamFuturenet  NetworkParam = "futurenet"
@@ -256,9 +263,9 @@ const (
 
 // Defines values for GetContractUptimeParamsWindow.
 const (
-	N24h GetContractUptimeParamsWindow = "24h"
-	N30d GetContractUptimeParamsWindow = "30d"
-	N7d  GetContractUptimeParamsWindow = "7d"
+	GetContractUptimeParamsWindowN24h GetContractUptimeParamsWindow = "24h"
+	GetContractUptimeParamsWindowN30d GetContractUptimeParamsWindow = "30d"
+	GetContractUptimeParamsWindowN7d  GetContractUptimeParamsWindow = "7d"
 )
 
 // Defines values for GetWatchdogStatsParamsNetwork.
@@ -601,6 +608,23 @@ type StorageEntry struct {
 	ValueDecoded       *interface{} `json:"value_decoded,omitempty"`
 	ValueXdr           string       `json:"value_xdr"`
 }
+
+// UptimeResult defines model for UptimeResult.
+type UptimeResult struct {
+	// ContractId The contract ID this uptime figure applies to.
+	ContractId string `json:"contract_id"`
+
+	// UptimePct Uptime percentage with up to two decimal places.
+	// Computed as healthy_checks / total_checks × 100.
+	// Returns 0 when no health checks were recorded in the window.
+	UptimePct float64 `json:"uptime_pct"`
+
+	// Window The time window over which uptime was computed.
+	Window UptimeResultWindow `json:"window"`
+}
+
+// UptimeResultWindow The time window over which uptime was computed.
+type UptimeResultWindow string
 
 // WatchdogStats defines model for WatchdogStats.
 type WatchdogStats struct {
@@ -986,7 +1010,7 @@ type ListContractHealthChecksParams struct {
 
 // GetContractUptimeParams defines parameters for GetContractUptime.
 type GetContractUptimeParams struct {
-	// Window Time window for uptime calculation (default 24h).
+	// Window Time window over which to compute uptime (default 24h).
 	Window *GetContractUptimeParamsWindow `form:"window,omitempty" json:"window,omitempty"`
 }
 
@@ -5627,15 +5651,9 @@ func (r ListContractHealthChecksResponse) StatusCode() int {
 type GetContractUptimeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *struct {
-		ContractId string `json:"contract_id"`
-
-		// UptimePct Percentage of checks with Healthy status (0–100).
-		UptimePct float64 `json:"uptime_pct"`
-		Window    string  `json:"window"`
-	}
-	JSON422 *InvalidInput
-	JSON500 *InternalError
+	JSON200      *UptimeResult
+	JSON422      *InvalidInput
+	JSON500      *InternalError
 }
 
 // Status returns HTTPResponse.Status
@@ -7819,13 +7837,7 @@ func ParseGetContractUptimeResponse(rsp *http.Response) (*GetContractUptimeRespo
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			ContractId string `json:"contract_id"`
-
-			// UptimePct Percentage of checks with Healthy status (0–100).
-			UptimePct float64 `json:"uptime_pct"`
-			Window    string  `json:"window"`
-		}
+		var dest UptimeResult
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
