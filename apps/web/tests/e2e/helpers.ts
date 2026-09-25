@@ -116,6 +116,28 @@ export function emptyWatchdogHandlers(): Record<string, Handler> {
   };
 }
 
+/**
+ * Watchdog contract-detail endpoints. The contract itself, its health-check
+ * history, and its alerts all live under `/watchdog/contracts/{id}`, so one
+ * handler branches on the path suffix.
+ */
+export function watchdogDetailHandlers(
+  healthChecks: unknown[]
+): Record<string, Handler> {
+  return {
+    "watchdog/contracts/": (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith("/health")) {
+        return { status: 200, body: { health_checks: healthChecks } };
+      }
+      if (path.endsWith("/alerts")) {
+        return { status: 200, body: { alerts: [] } };
+      }
+      return { status: 200, body: monitoredContract() };
+    },
+  };
+}
+
 export function contractSummary() {
   return {
     id: CONTRACT_ID,
