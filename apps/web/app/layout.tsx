@@ -11,6 +11,9 @@ export const metadata: Metadata = {
     "Indexed observability for Soroban smart contracts — events, invocations, storage, and anomaly detection on Stellar.",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   openGraph: {
     type: "website",
