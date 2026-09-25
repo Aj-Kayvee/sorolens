@@ -147,6 +147,12 @@ export interface TrackContractRequest {
   label?: string;
 }
 
+export interface LabelResolution {
+  label: string;
+  value: string;
+  scope: string;
+}
+
 export type TimeWindow = "24h" | "7d" | "30d" | "all";
 
 // ---- watchdog --------------------------------------------------------------
@@ -370,4 +376,3 @@ export interface AlertSubscription {
 export interface SubscriptionsResponse {
   subscriptions: AlertSubscription[];
 }
-
