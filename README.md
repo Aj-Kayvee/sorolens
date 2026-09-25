@@ -132,6 +132,14 @@ The REST API is described by an OpenAPI 3.0 spec at [`docs/openapi.yaml`](docs/o
 
 Admin: `GAZ3HN2QNDKWLOI2OQEG65KBJEAUP4PROR3FJNXNDY34UH547MN4CJUI`
 
+### Mainnet
+
+| Contract | ID | Explorer | Status |
+|----------|----|----------|--------|
+| Watchdog | _TBA — not deployed yet_ | — | ⏳ Coming soon |
+
+> ⏳ **Coming soon.** Mainnet is on the roadmap. The row above is a placeholder: the mainnet contract ID and explorer link will be published here once the deployment is live.
+
 ---
 ## Tech stack
 | Layer | Technology |
