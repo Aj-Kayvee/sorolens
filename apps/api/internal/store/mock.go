@@ -28,21 +28,22 @@ type MockStore struct {
 	indexerCursors     map[string]uint32
 
 	// Error injection
-	UpsertContractErr   error
-	GetContractErr      error
-	ListContractsErr    error
-	GetGlobalStatsErr   error
-	ListEventsErr       error
-	ListInvocationsErr  error
-	ListStorageErr      error
-	GetContractStatsErr error
-	RecentEventsErr     error
-	CreateAPIKeyErr     error
-	GetAPIKeyErr        error
-	UpsertUserErr       error
-	GetUserErr          error
-	ListUpgradesErr     error
-	GetHealthScoreErr   error
+	UpsertContractErr    error
+	GetContractErr       error
+	ListContractsErr     error
+	GetGlobalStatsErr    error
+	ListEventsErr        error
+	ListInvocationsErr   error
+	ListStorageErr       error
+	GetContractStatsErr  error
+	RecentEventsErr      error
+	RecentInvocationsErr error
+	CreateAPIKeyErr      error
+	GetAPIKeyErr         error
+	UpsertUserErr        error
+	GetUserErr           error
+	ListUpgradesErr      error
+	GetHealthScoreErr    error
 }
 
 // NewMockStore returns an initialized MockStore.
@@ -445,6 +446,24 @@ func (m *MockStore) RecentEvents(_ context.Context, contractID string, limit int
 	for i := len(m.events) - 1; i >= 0 && len(out) < limit; i-- {
 		if m.events[i].ContractID == contractID {
 			out = append(out, m.events[i])
+		}
+	}
+	return out, nil
+}
+
+// RecentInvocations returns the newest invocations for a contract, mirroring
+// the postgres query's ledger/tx-hash descending order.
+func (m *MockStore) RecentInvocations(_ context.Context, contractID string, limit int) ([]Invocation, error) {
+	if m.RecentInvocationsErr != nil {
+		return nil, m.RecentInvocationsErr
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	var out []Invocation
+	for i := len(m.invocations) - 1; i >= 0 && len(out) < limit; i-- {
+		if m.invocations[i].ContractID == contractID {
+			out = append(out, m.invocations[i])
 		}
 	}
 	return out, nil

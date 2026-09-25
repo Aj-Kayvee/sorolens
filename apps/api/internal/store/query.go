@@ -97,6 +97,11 @@ type QueryStore interface {
 	ListStorageEntries(ctx context.Context, contractID, cursor string, limit int, f StorageFilters) ([]StorageEntry, string, error)
 	GetContractStats(ctx context.Context, contractID, window string) (ContractStats, error)
 	RecentEvents(ctx context.Context, contractID string, limit int) ([]Event, error)
+	// RecentInvocations returns the most recent invocations for a contract,
+	// newest first, capped at limit. Like RecentEvents it backs single-call
+	// "latest invocation" lookups (e.g. the dashboard summary) without walking
+	// the ascending paginated list.
+	RecentInvocations(ctx context.Context, contractID string, limit int) ([]Invocation, error)
 
 	// ContractFirstLedger returns the earliest ledger for which the contract
 	// has indexed data (events or invocations). It returns 0 when nothing has
@@ -251,7 +256,49 @@ func (s *postgresStore) RecentEvents(ctx context.Context, contractID string, lim
 	return out, rows.Err()
 }
 
-// ---- ListInvocations --------------------------------------------------------
+// ---- RecentInvocations ------------------------------------------------------
+
+// RecentInvocations returns the newest invocations for one contract, ordered
+// by ledger and tx hash descending. It mirrors RecentEvents and is the
+// single-row lookup the dashboard summary uses for "latest invocation".
+func (s *postgresStore) RecentInvocations(ctx context.Context, contractID string, limit int) ([]Invocation, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT tx_hash, contract_id, network, ledger, ledger_closed_at, status,
+		       function_name, args_decoded, result_decoded, result_xdr,
+		       resource_fee_charged, cpu_insn, mem_byte,
+		       ledger_read_byte, ledger_write_byte, application_order, inserted_at
+		FROM invocations
+		WHERE contract_id = $1
+		ORDER BY ledger DESC, tx_hash DESC
+		LIMIT $2`,
+		contractID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("recent invocations: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Invocation
+	for rows.Next() {
+		var inv Invocation
+		var argsDec, resultDec []byte
+		if err := rows.Scan(
+			&inv.TxHash, &inv.ContractID, &inv.Network, &inv.Ledger, &inv.LedgerClosedAt, &inv.Status,
+			&inv.FunctionName, &argsDec, &resultDec, &inv.ResultXDR,
+			&inv.ResourceFeeCharged, &inv.CPUInsn, &inv.MemByte,
+			&inv.LedgerReadByte, &inv.LedgerWriteByte, &inv.ApplicationOrder, &inv.InsertedAt,
+		); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal(argsDec, &inv.ArgsDecoded)
+		_ = json.Unmarshal(resultDec, &inv.ResultDecoded)
+		out = append(out, inv)
+	}
+	return out, rows.Err()
+}
 
 func (s *postgresStore) ListInvocations(ctx context.Context, contractID, cursor string, limit int, f InvocationFilters) ([]Invocation, string, error) {
 	if limit <= 0 || limit > 200 {

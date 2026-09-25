@@ -67,6 +67,7 @@ func New(h *handler.Handler) http.Handler {
 		get("/contracts/{id}/snapshot", h.ContractSnapshot)
 		get("/contracts/{id}/upgrades", h.ListContractUpgrades)
 		get("/contracts/{id}/health-score", h.GetContractHealthScore)
+		get("/contracts/{id}/summary", h.ContractSummary)
 		get("/contracts/{id}/stream", h.StreamEvents)
 		get("/contracts/{id}/graph", h.ContractGraph)
 		get("/stream/events", h.StreamEventsSSE)
