@@ -156,6 +156,42 @@ export interface UptimeResponse {
   uptime_pct: number;
 }
 
+/**
+ * One contract's service-level summary for a calendar month (issue #266).
+ * Derived from watchdog health checks and alerts, not from a separate source.
+ */
+export interface MonthlySLA {
+  contract_id: string;
+  /** Reporting period, YYYY-MM (UTC). */
+  month: string;
+  /** Healthy checks / total checks * 100. Zero when there are no checks. */
+  uptime_pct: number;
+  total_checks: number;
+  healthy_checks: number;
+  /** Outages: transitions from Healthy into any other status. */
+  incidents: number;
+  /** Mean time to recovery in seconds, across incidents that recovered. */
+  mttr_seconds: number;
+  total_downtime_seconds: number;
+  longest_outage_seconds: number;
+  /** True when the month ends mid-incident, so MTTR excludes that incident. */
+  ongoing_outage: boolean;
+  critical_alerts: number;
+  warning_alerts: number;
+  info_alerts: number;
+  total_alerts: number;
+  first_check: string | null;
+  last_check: string | null;
+}
+
+export interface SLAHistoryResponse {
+  contract_id: string;
+  /** Oldest first, so it maps straight onto a chart's x-axis. */
+  months: MonthlySLA[];
+}
+
+export type ReportFormat = "json" | "csv" | "pdf";
+
 export interface MonitoredContract {
   contract_id: string;
   network: string;

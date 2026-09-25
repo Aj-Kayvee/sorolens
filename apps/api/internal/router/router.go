@@ -156,6 +156,14 @@ func New(h *handler.Handler, maxBodyBytes int64) http.Handler {
 		get("/watchdog/contracts/{id}/alerts", h.ListWatchdogAlerts)
 		get("/watchdog/contracts/{id}/uptime", h.GetContractUptime)
 
+		// Monthly SLA and uptime reporting (issue #266). Reports are derived
+		// from the watchdog health checks and alerts already stored, so there
+		// is no new ingestion path. The badge is plain SVG so it can be
+		// embedded in a README without a client library.
+		get("/reports/{contract_id}", h.GetContractReport)
+		get("/reports/{contract_id}/history", h.GetContractReportHistory)
+		get("/reports/{contract_id}/badge.svg", h.GetContractSLABadge)
+
 		// Alert notification subscriptions (issue #127). They hold
 		// integration secrets, so reading them also needs contributor.
 		r.With(scope, contributor).Post("/watchdog/subscriptions", h.CreateSubscription)
