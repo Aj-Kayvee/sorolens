@@ -145,6 +145,14 @@ export type TimeWindow = "24h" | "7d" | "30d" | "all";
 
 export type HealthStatus = "Healthy" | "Degraded" | "Unresponsive" | string;
 export type AlertSeverity = "Info" | "Warning" | "Critical";
+export type UptimeWindow = "24h" | "7d" | "30d";
+
+export interface UptimeResponse {
+  contract_id: string;
+  window: UptimeWindow;
+  /** Uptime percentage in the range [0, 100] with up to 2 decimal places. */
+  uptime_pct: number;
+}
 
 export interface MonitoredContract {
   contract_id: string;

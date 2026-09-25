@@ -17,6 +17,8 @@ import type {
   StorageResponse,
   TimeWindow,
   TrackContractRequest,
+  UptimeResponse,
+  UptimeWindow,
   WatchdogStats,
   CreateSubscriptionRequest,
   SubscriptionsResponse,
