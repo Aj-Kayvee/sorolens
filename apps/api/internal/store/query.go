@@ -35,8 +35,11 @@ func NewFullStore(pool *pgxpool.Pool) FullStore {
 type EventFilters struct {
 	Type    string
 	Network string
-	From    uint32
-	To      uint32
+	// Topic matches events whose decoded topic list contains the given value
+	// (JSONB containment). See topicFilterJSON for the accepted encodings.
+	Topic string
+	From  uint32
+	To    uint32
 }
 
 // InvocationFilters holds optional query filters for listing invocations.
@@ -125,6 +128,18 @@ func (s *postgresStore) ListEvents(ctx context.Context, contractID, cursor strin
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
+	// The topic filter is appended only when set so the planner always sees a
+	// plain `topic_decoded @> $n::jsonb` predicate and can use the GIN index
+	// added in migration 000009. Wrapping it in a `($n = '' OR ...)` guard
+	// like the other filters would hide the containment operator behind a
+	// disjunction and force a sequential scan.
+	args := []any{contractID, cursor, f.Network, f.Type, f.From, f.To, limit + 1}
+	topicClause := ""
+	if f.Topic != "" {
+		args = append(args, topicFilterJSON(f.Topic))
+		topicClause = fmt.Sprintf("  AND topic_decoded @> $%d::jsonb\n", len(args))
+	}
+
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, contract_id, network, ledger, ledger_closed_at, tx_hash, type,
 		       topic_xdr, value_xdr, topic_decoded, value_decoded,
@@ -136,9 +151,9 @@ func (s *postgresStore) ListEvents(ctx context.Context, contractID, cursor strin
 		  AND ($4 = '' OR type = $4)
 		  AND ($5 = 0   OR ledger >= $5)
 		  AND ($6 = 0   OR ledger <= $6)
-		ORDER BY ledger ASC, id ASC
+`+topicClause+`		ORDER BY ledger ASC, id ASC
 		LIMIT $7`,
-		contractID, cursor, f.Network, f.Type, f.From, f.To, limit+1,
+		args...,
 	)
 	if err != nil {
 		return nil, "", fmt.Errorf("list events: %w", err)
@@ -171,6 +186,29 @@ func (s *postgresStore) ListEvents(ctx context.Context, contractID, cursor strin
 		out = out[:limit]
 	}
 	return out, nextCursor, nil
+}
+
+// topicFilterJSON encodes a ?topic= value as a JSONB array for the containment
+// operator used by ListEvents (`topic_decoded @> $n::jsonb`).
+//
+// The value is treated as JSON when it parses, so `123` matches the number 123
+// and `"transfer"` matches the string "transfer". Anything that is not valid
+// JSON is treated as a bare string, so `transfer` also matches "transfer".
+// Decoded topics are stored as a JSON array, hence the array wrapper.
+func topicFilterValue(topic string) any {
+	var v any
+	if err := json.Unmarshal([]byte(topic), &v); err != nil {
+		return topic
+	}
+	return v
+}
+
+func topicFilterJSON(topic string) string {
+	b, err := json.Marshal([]any{topicFilterValue(topic)})
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
 }
 
 // ---- RecentEvents -----------------------------------------------------------

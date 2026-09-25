@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sort"
 	"time"
@@ -210,6 +211,9 @@ func (m *MockStore) ListEvents(_ context.Context, contractID, cursor string, lim
 		if f.Type != "" && e.Type != f.Type {
 			continue
 		}
+		if f.Topic != "" && !topicDecodedContains(e.TopicDecoded, f.Topic) {
+			continue
+		}
 		out = append(out, e)
 		if len(out) > limit {
 			break
@@ -221,6 +225,29 @@ func (m *MockStore) ListEvents(_ context.Context, contractID, cursor string, lim
 		out = out[:limit]
 	}
 	return out, nextCursor, nil
+}
+
+// topicDecodedContains reports whether a decoded topic list contains the value
+// encoded by a ?topic= filter. Comparison goes through JSON so an int in test
+// data matches the float64 produced by decoding a numeric filter, mirroring the
+// containment semantics of postgresStore.ListEvents.
+func topicDecodedContains(topics []any, topic string) bool {
+	want := topicFilterValue(topic)
+	for _, t := range topics {
+		if jsonValueEqual(t, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func jsonValueEqual(a, b any) bool {
+	ab, errA := json.Marshal(a)
+	bb, errB := json.Marshal(b)
+	if errA != nil || errB != nil {
+		return false
+	}
+	return string(ab) == string(bb)
 }
 
 func (m *MockStore) ListInvocations(_ context.Context, contractID, cursor string, limit int, f InvocationFilters) ([]Invocation, string, error) {
