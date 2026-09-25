@@ -28,6 +28,7 @@ type MockStore struct {
 	healthScores       map[string]ContractHealthScore
 	indexerCursors     map[string]uint32
 	contractVersions   map[string][]ContractVersion
+	alertGroups        []AlertGroup
 
 	// Error injection
 	UpsertContractErr           error
