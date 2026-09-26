@@ -106,8 +106,10 @@ from .list_contract_storage_network import ListContractStorageNetwork
 from .list_contract_storage_response_200 import ListContractStorageResponse200
 from .list_contract_storage_status import ListContractStorageStatus
 from .list_contract_upgrades_response_200 import ListContractUpgradesResponse200
+from .list_contracts_dir import ListContractsDir
 from .list_contracts_network import ListContractsNetwork
 from .list_contracts_response_200 import ListContractsResponse200
+from .list_contracts_sort import ListContractsSort
 from .list_failed_events_response_200 import ListFailedEventsResponse200
 from .list_monitored_contracts_network import ListMonitoredContractsNetwork
 from .list_monitored_contracts_response_200 import ListMonitoredContractsResponse200
@@ -298,8 +300,10 @@ __all__ = (
     "ListContractStorageResponse200",
     "ListContractStorageStatus",
     "ListContractUpgradesResponse200",
+    "ListContractsDir",
     "ListContractsNetwork",
     "ListContractsResponse200",
+    "ListContractsSort",
     "ListFailedEventsResponse200",
     "ListMonitoredContractsNetwork",
     "ListMonitoredContractsResponse200",
