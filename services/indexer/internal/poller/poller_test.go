@@ -27,6 +27,10 @@ type fakeRPC struct {
 	ledgerEntries map[string]LedgerEntry // key: base64 LedgerKey
 	txErr         error
 	eventsCalls   []getEventsCall
+	// onGetEvents, when set, runs after each GetEvents call has released the
+	// lock. Tests use it to simulate RPC latency and measure how many calls
+	// overlap (see the contract-processing concurrency test).
+	onGetEvents func()
 }
 
 type getEventsCall struct {
@@ -49,16 +53,27 @@ func (f *fakeRPC) GetLatestLedger(ctx context.Context) (*LatestLedger, error) {
 
 func (f *fakeRPC) GetEvents(_ context.Context, start, end uint32, filters []EventFilter) (*GetEventsResult, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.eventsCalls = append(f.eventsCalls, getEventsCall{start, end, filters})
 	key := ""
 	if len(filters) > 0 && len(filters[0].ContractIDs) > 0 {
 		key = filters[0].ContractIDs[0]
 	}
+	var res *GetEventsResult
 	if r, ok := f.events[key]; ok {
-		return r, nil
+		res = r
+	} else {
+		res = &GetEventsResult{LatestLedger: 500000}
 	}
-	return &GetEventsResult{LatestLedger: 500000}, nil
+	onGetEvents := f.onGetEvents
+	f.mu.Unlock()
+
+	// Run the hook with the lock released so concurrent GetEvents calls can
+	// actually overlap; otherwise the simulated latency would serialize them
+	// and the concurrency test could never observe more than one in flight.
+	if onGetEvents != nil {
+		onGetEvents()
+	}
+	return res, nil
 }
 
 func (f *fakeRPC) GetTransaction(_ context.Context, hash string) (*TransactionResult, error) {
@@ -107,6 +122,9 @@ type fakeStore struct {
 	healthInputs map[string]HealthInputs // contractID -> inputs
 	healthScores []ContractHealthScore
 	failedEvents []FailedEvent
+	// indexerCursors maps network -> last committed ledger (the indexer
+	// cursor) shared by Get/SetIndexerCursor and BatchInsertWithCursor.
+	indexerCursors map[string]uint32
 	// eventInsertErrs maps event ID -> error returned by BatchInsertEvents.
 	// Used to simulate deliberately bad events for the DLQ path (issue #202).
 	eventInsertErrs map[string]error
@@ -116,11 +134,12 @@ type fakeStore struct {
 
 func newFakeStore(contracts []Contract) *fakeStore {
 	return &fakeStore{
-		contracts:    contracts,
-		syncStates:   make(map[string]SyncState),
-		hourly:       make(map[string][]HourlyActivity),
-		wasmHashes:   make(map[string]string),
-		healthInputs: make(map[string]HealthInputs),
+		contracts:      contracts,
+		syncStates:     make(map[string]SyncState),
+		hourly:         make(map[string][]HourlyActivity),
+		wasmHashes:     make(map[string]string),
+		healthInputs:   make(map[string]HealthInputs),
+		indexerCursors: make(map[string]uint32),
 	}
 }
 
@@ -200,6 +219,9 @@ func (f *fakeStore) GetIndexerCursor(_ context.Context, network string) (uint32,
 func (f *fakeStore) SetIndexerCursor(_ context.Context, network string, ledger uint32) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.indexerCursors == nil {
+		f.indexerCursors = make(map[string]uint32)
+	}
 	if ledger > f.indexerCursors[network] {
 		f.indexerCursors[network] = ledger
 	}
@@ -216,6 +238,9 @@ func (f *fakeStore) BatchInsertWithCursor(ctx context.Context, network string, l
 	f.invocations = append(f.invocations, invocations...)
 	if syncState.ContractID != "" {
 		f.syncStates[syncState.ContractID] = syncState
+	}
+	if f.indexerCursors == nil {
+		f.indexerCursors = make(map[string]uint32)
 	}
 	if ledger > f.indexerCursors[network] {
 		f.indexerCursors[network] = ledger

@@ -127,6 +127,7 @@ func (p *Poller) runOnce(ctx context.Context) error {
 
 	err := p.processAll(ctx)
 	elapsed := time.Since(start)
+	p.metrics.ObserveRunDuration("once", elapsed.Seconds())
 
 	if ctx.Err() == context.DeadlineExceeded {
 		p.log.Warn("indexer run exceeded max-duration, exiting cleanly",
@@ -141,9 +142,11 @@ func (p *Poller) runOnce(ctx context.Context) error {
 // runContinuous loops until ctx is cancelled, sleeping PollInterval between passes.
 func (p *Poller) runContinuous(ctx context.Context) error {
 	for {
+		passStart := time.Now()
 		if err := p.processAll(ctx); err != nil {
 			p.log.Error("indexer pass error", "err", err)
 		}
+		p.metrics.ObserveRunDuration("continuous", time.Since(passStart).Seconds())
 		select {
 		case <-ctx.Done():
 			p.log.Info("indexer shutting down")
@@ -547,6 +550,13 @@ func (p *Poller) processContract(ctx context.Context, contract Contract) error {
 	if err := p.store.UpsertSyncState(ctx, newState); err != nil {
 		return fmt.Errorf("upsert sync state: %w", err)
 	}
+
+	// Only count work that was actually committed: a failed insert returns
+	// above, so these series always describe durable progress. The lag sample
+	// uses the batch's final ledger as the committed cursor, which is clamped
+	// at zero against the observed head.
+	p.metrics.AddEventsProcessed(network, len(events))
+	p.metrics.ObserveNetwork(network, latest.Sequence, endLedger)
 
 	log.Info("contract indexed",
 		"events", len(events),
