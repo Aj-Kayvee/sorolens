@@ -150,6 +150,22 @@ type LabelStore interface {
 	ResolveLabel(ctx context.Context, workspaceID, query string) (Label, error)
 }
 
+// ContractBulkStore is the write surface for bulk contract actions used by the
+// /api/v1/contracts/batch endpoint.
+type ContractBulkStore interface {
+	// DeleteContracts permanently untracks the given contracts. Each contract
+	// row is removed together with every indexed row that references it
+	// (events, invocations, storage entries and history, sync state, upgrades,
+	// health scores, performance baselines) in a single transaction, so a
+	// partial untrack cannot leave orphaned data. Watchlist rows cascade.
+	// Returns the number of contracts actually deleted.
+	DeleteContracts(ctx context.Context, ids []string) (int64, error)
+
+	// SetContractLabel sets the label (tag) on each of the given contracts and
+	// returns the number of contracts updated.
+	SetContractLabel(ctx context.Context, ids []string, label string) (int64, error)
+}
+
 // ContractFilters holds optional query filters for listing contracts.
 type ContractFilters struct {
 	// Network restricts results to one of testnet | mainnet | futurenet.
