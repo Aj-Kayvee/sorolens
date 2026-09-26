@@ -27,6 +27,7 @@ type APIStore interface {
 	store.WatchlistStore
 	store.UserStore
 	store.PerformanceStore
+	store.ContractWasmStore
 	store.FailedEventStore
 	store.GlobalEventStore
 	store.LabelStore

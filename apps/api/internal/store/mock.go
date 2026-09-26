@@ -28,6 +28,7 @@ type MockStore struct {
 	alertSubscriptions []AlertSubscription
 	users              map[string]User
 	healthScores       map[string]ContractHealthScore
+	wasmBinaries       map[string]ContractWasm
 	failedEvents       map[int64]FailedEvent
 	failedEventSeq     int64
 	indexerCursors     map[string]uint32
@@ -58,6 +59,7 @@ type MockStore struct {
 	GetLatestContractVersionErr error
 	UpsertContractSpecErr       error
 	GetContractSpecErr          error
+	GetWasmErr                  error
 	InsertFailedEventErr        error
 	ListFailedEventsErr         error
 	GetFailedEventErr           error
@@ -99,6 +101,7 @@ func NewMockStore() *MockStore {
 		alerts:             make([]ContractAlert, 0),
 		alertSubscriptions: make([]AlertSubscription, 0),
 		users:              make(map[string]User),
+		wasmBinaries:       make(map[string]ContractWasm),
 		indexerCursors:     make(map[string]uint32),
 		contractSpecs:      make(map[string]ContractSpec),
 		contractVersions:   make(map[string][]ContractVersion),
