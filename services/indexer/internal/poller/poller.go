@@ -12,6 +12,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"runtime"
+	"sync"
 	"time"
 
 	"github.com/sorolens/sorolens/services/indexer/internal/anomaly"
@@ -41,6 +43,9 @@ const (
 
 // Config holds runtime parameters for the Poller.
 type Config struct {
+	// Workers is the maximum number of contracts processed concurrently. Values
+	// less than one default to GOMAXPROCS.
+	Workers int
 	// LedgerWindow is the maximum number of ledgers to request per getEvents
 	// call. Matches INDEXER_LEDGER_WINDOW from the API config.
 	LedgerWindow uint32
@@ -97,7 +102,7 @@ func NewWithRPCClients(rpcClients map[string]RPCClient, store Store, redis Redis
 // Run starts the poller in the given mode.
 // mode must be "once" or "continuous".
 // The context controls graceful shutdown: when ctx is cancelled the poller
-// finishes the current contract then returns.
+// finishes in-flight contracts, skips queued contracts, then returns.
 func (p *Poller) Run(ctx context.Context, mode string) error {
 	switch mode {
 	case "once":
@@ -154,33 +159,67 @@ func (p *Poller) processAll(ctx context.Context) error {
 	if err := partition.EnsureNextMonthPartition(ctx, p.store); err != nil {
 		p.log.Warn("failed to ensure next month partition", "err", err)
 	}
+	workerCount := p.cfg.Workers
+	if workerCount < 1 {
+		workerCount = runtime.GOMAXPROCS(0)
+	}
+	jobs := make(chan Contract, workerCount)
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for i := 0; i < workerCount; i++ {
+		go func() {
+			defer workers.Done()
+			for contract := range jobs {
+				// Preserve graceful shutdown semantics: contracts already being
+				// processed finish, but queued contracts do not start after cancel.
+				if ctx.Err() != nil {
+					continue
+				}
+				if err := p.processContract(context.WithoutCancel(ctx), contract); err != nil {
+					// One failing contract must not block the rest of the pass.
+					p.log.Error("failed to index contract",
+						"contract_id", contract.ID,
+						"err", err,
+					)
+				}
+			}
+		}()
+	}
+	stopWorkers := func() {
+		close(jobs)
+		workers.Wait()
+	}
 
 	var cursor string
 	for {
 		// Check for shutdown between contract batches.
 		if ctx.Err() != nil {
+			stopWorkers()
 			return nil
 		}
 
 		contracts, next, err := p.store.ListContracts(ctx, cursor, 50)
 		if err != nil {
+			stopWorkers()
 			return fmt.Errorf("list contracts: %w", err)
 		}
 
+	contractBatch:
 		for _, c := range contracts {
 			if ctx.Err() != nil {
-				return nil
+				break contractBatch
 			}
 			if c.Status != "active" && c.Status != "backfilling" {
 				continue
 			}
-			if err := p.processContract(ctx, c); err != nil {
-				// Log and continue; one failing contract must not block others.
-				p.log.Error("failed to index contract",
-					"contract_id", c.ID,
-					"err", err,
-				)
+			select {
+			case <-ctx.Done():
+				break contractBatch
+			case jobs <- c:
 			}
+		}
+		if ctx.Err() != nil {
+			break
 		}
 
 		if next == "" {
@@ -188,6 +227,7 @@ func (p *Poller) processAll(ctx context.Context) error {
 		}
 		cursor = next
 	}
+	stopWorkers()
 
 	if p.cfg.AnomalyEnabled {
 		p.runAnomalyDetection(ctx)
