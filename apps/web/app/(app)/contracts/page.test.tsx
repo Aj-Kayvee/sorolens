@@ -113,8 +113,6 @@ vi.mock("@sorolens/ui", () => ({
                       : "↕"}
                   </span>
                 )}
-              <th key={col.key} data-testid={`col-${col.key}`}>
-                {col.header}
               </th>
             ))}
           </tr>
