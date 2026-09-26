@@ -553,7 +553,10 @@ type Contract struct {
 	Label              string         `json:"label"`
 	Network            string         `json:"network"`
 	Status             ContractStatus `json:"status"`
-	WasmHash           string         `json:"wasm_hash"`
+
+	// Tags User-defined tags, sorted ascending. Always present; empty when the contract has no tags.
+	Tags     []string `json:"tags"`
+	WasmHash string   `json:"wasm_hash"`
 }
 
 // ContractStatus defines model for Contract.Status.
@@ -1388,6 +1391,9 @@ type ListContractsParams struct {
 
 	// Status Filter by contract status (pending, active, backfilling, error, paused).
 	Status *string `form:"status,omitempty" json:"status,omitempty"`
+
+	// Tag Show only contracts carrying this tag.
+	Tag *TagParam `form:"tag,omitempty" json:"tag,omitempty"`
 }
 
 // ListContractsParamsNetwork defines parameters for ListContracts.

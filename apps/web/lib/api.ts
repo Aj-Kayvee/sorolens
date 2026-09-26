@@ -5,6 +5,7 @@ import type {
   CompareResponse,
   ContractSnapshot,
   ContractSummary,
+  ContractTagsResponse,
   ContractsListResponse,
   EventsResponse,
   GlobalEventsResponse,
@@ -73,6 +74,27 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+// fetchNoContent is the variant for endpoints that return 204 with no body.
+async function fetchNoContent(url: string, options?: RequestInit): Promise<void> {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+
+  if (!res.ok) {
+    let body: { error?: string; code?: string } = {};
+    try {
+      body = await res.json();
+    } catch {
+      // ignore parse error
+    }
+    throw new ApiError(res.status, body.error || res.statusText, body.code);
+  }
+}
+
 export function listContractsAll(): Promise<ContractsListResponse> {
   return fetchJson<ContractsListResponse>(
     `${API_URL}/api/v1/contracts?limit=1000`
@@ -90,6 +112,7 @@ export function listContracts(params?: {
   if (params?.limit) search.set("limit", String(params.limit));
   if (params?.network) search.set("network", params.network);
   if (params?.status) search.set("status", params.status);
+  if (params?.tag) search.set("tag", params.tag);
   const qs = search.toString();
   return fetchJson<ContractsListResponse>(
     `${API_URL}/api/v1/contracts${qs ? "?" + qs : ""}`

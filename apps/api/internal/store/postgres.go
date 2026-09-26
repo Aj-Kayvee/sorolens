@@ -82,7 +82,15 @@ func (s *postgresStore) GetContract(ctx context.Context, contractID string) (Con
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Contract{}, ErrNotFound
 	}
-	return c, err
+	if err != nil {
+		return c, err
+	}
+	tags, err := s.ListContractTags(ctx, contractID)
+	if err != nil {
+		return c, err
+	}
+	c.Tags = tags
+	return c, nil
 }
 
 // ListContracts returns a list of contracts matching the optional filters,
@@ -134,6 +142,23 @@ func (s *postgresStore) ListContracts(ctx context.Context, cursor string, limit 
 	if len(out) > limit {
 		nextCursor = out[limit-1].ID
 		out = out[:limit]
+	}
+
+	// Attach tags for the returned page in one query rather than per row.
+	ids := make([]string, len(out))
+	for i := range out {
+		ids[i] = out[i].ID
+	}
+	tags, err := s.contractTagsByContract(ctx, ids)
+	if err != nil {
+		return nil, "", err
+	}
+	for i := range out {
+		if t, ok := tags[out[i].ID]; ok {
+			out[i].Tags = t
+		} else {
+			out[i].Tags = []string{}
+		}
 	}
 	return out, nextCursor, nil
 }

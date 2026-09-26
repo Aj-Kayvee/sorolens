@@ -11,6 +11,7 @@ export interface Contract {
   } | null;
   storage_entry_count: number;
   expiring_entry_count: number;
+  tags: string[];
 }
 
 export interface ContractDetail extends Contract {

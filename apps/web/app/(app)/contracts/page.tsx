@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { DataTable, Toast } from "@sorolens/ui";
 import type { Column } from "@sorolens/ui";
@@ -12,23 +12,6 @@ import { contractRowKey, isPendingRow } from "@/lib/optimisticTrack";
 import type { ContractRow } from "@/lib/optimisticTrack";
 import { TableSkeleton } from "@/components/Skeleton";
 import ImportContractsCsv from "@/components/ImportContractsCsv";
-
-// RBAC identity: same localStorage key the watchlist page uses, so the UI
-// registers a contract under the same user identity. Must map to a user
-// granted at least the contributor role in the API's users table.
-const STORAGE_KEY = "sorolens_user_id";
-
-function getUserId(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    return window.localStorage.getItem(STORAGE_KEY) || "";
-  } catch {
-    // localStorage can be unavailable (private mode, some test runners);
-    // RBAC still allows registered-contract calls for anonymous callers as
-    // reads remain open.
-    return "";
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -171,6 +154,9 @@ export default function ContractsPage() {
   // Search state
   const [search, setSearch] = useState("");
 
+  // Tag filter state (server-side, combined with the network filter)
+  const [tagFilter, setTagFilter] = useState("");
+
   // Sort state
   const [sortColumn, setSortColumn] = useState<string>("added_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -203,6 +189,7 @@ export default function ContractsPage() {
           cursor: cursor ?? undefined,
           limit: PAGE_SIZE,
           network: networkFilter(network),
+          tag: tagFilter || undefined,
         });
         if (seq !== loadSeq.current) return;
         setContracts(data.contracts ?? []);
@@ -224,16 +211,20 @@ export default function ContractsPage() {
     load(cursors[cursorIndex]);
   }, [load, cursors, cursorIndex]);
 
-  // Reset to the first page when the network filter changes. The ref guard
-  // keeps this from firing an extra fetch on mount.
+  // Reset to the first page when the network or tag filter changes. The ref
+  // guard keeps this from firing an extra fetch on mount.
   const prevNetwork = useRef(network);
+  const prevTag = useRef(tagFilter);
   useEffect(() => {
-    if (prevNetwork.current !== network) {
+    const networkChanged = prevNetwork.current !== network;
+    const tagChanged = prevTag.current !== tagFilter;
+    if (networkChanged || tagChanged) {
       prevNetwork.current = network;
+      prevTag.current = tagFilter;
       setCursors([null]);
       setCursorIndex(0);
     }
-  }, [network]);
+  }, [network, tagFilter]);
 
   // ---------------------------------------------------------------------------
   // Pagination handlers
@@ -299,6 +290,9 @@ export default function ContractsPage() {
     setCursorIndex(0);
   };
 
+  // Columns depend on the tag-click handler so a tag chip can set the filter.
+  const columns = useMemo(() => makeColumns((tag) => setTagFilter(tag)), []);
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -353,8 +347,8 @@ export default function ContractsPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="mb-4">
+        {/* Filters: free-text search and server-side tag filter */}
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row">
           <input
             id="contracts-search"
             type="search"
@@ -363,6 +357,15 @@ export default function ContractsPage() {
             placeholder="Search by alias or contract ID…"
             aria-label="Search contracts"
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-2.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-accent)] focus:outline-none"
+          />
+          <input
+            id="contracts-tag-filter"
+            type="search"
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            placeholder="Filter by tag…"
+            aria-label="Filter contracts by tag"
+            className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-2.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-accent)] focus:outline-none sm:max-w-xs"
           />
         </div>
 
@@ -377,7 +380,7 @@ export default function ContractsPage() {
                 ? "No contracts match your search"
                 : "No contracts tracked yet"}
             </p>
-            {!search && (
+            {!search && !tagFilter && (
               <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
                 Use the CLI or API to start tracking a Soroban contract, or
                 click{" "}
