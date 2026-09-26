@@ -444,6 +444,42 @@ Paginated event list for a contract.
 }
 ```
 
+#### `GET /api/v1/contracts/:id/events.csv`
+
+Flat CSV export of a contract's events, for handing the whole history to a
+spreadsheet or an analyst in one request. Rows are streamed straight from the
+query, so memory use in the API does not grow with the size of the export.
+Served as a download with `Content-Type: text/csv; charset=utf-8` and
+`Content-Disposition: attachment; filename="<id>-events.csv"`.
+
+**Query params:** `network`, `type`, `from` / `to` (inclusive ledger bounds).
+`topic` and `in_successful_call` are not supported here, and there is no `cursor`
+and no `limit`: an export is meant to be complete.
+
+**Columns** (in order): `id`, `contract_id`, `network`, `ledger`,
+`ledger_closed_at`, `tx_hash`, `type`, `topic_xdr`, `value_xdr`,
+`topic_decoded`, `value_decoded`, `in_successful_call`. The three `*_xdr` /
+`*_decoded` columns hold JSON.
+
+**Responses:**
+- `200`: the header row, then one row per matching event ordered by
+  `(ledger, id)` ascending. The export is deterministic, so an unchanged store
+  produces an identical file and a diff means the data changed. An unknown
+  contract yields the header row with no data rows, matching the JSON listing.
+- `422`: `network` is not a known network, a ledger bound is not a positive
+  integer, or `from` is greater than `to`.
+
+Two details worth knowing before opening a downloaded file:
+
+- Free-text columns (`type`, `value_xdr`) are prefixed with an apostrophe when
+  they start with `=`, `+`, `-` or `@`, because a spreadsheet would otherwise
+  evaluate a contract-supplied value as a formula. The JSON columns are left
+  alone: they always open with a bracket, a quote or a digit.
+- The response is committed as soon as the first byte is written, so a store
+  failure part-way through a large export is logged rather than turned into an
+  error status. A failure before any row is written still answers `500` with a
+  JSON error body.
+
 ---
 
 ### 4.3 Invocations

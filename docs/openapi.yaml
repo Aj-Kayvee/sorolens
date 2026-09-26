@@ -321,6 +321,70 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/contracts/{id}/events.csv:
+    get:
+      tags: [Events]
+      summary: Export contract events as CSV
+      description: >
+        Streams every matching event as CSV instead of paginating them, so a
+        large contract can be handed to a spreadsheet or an analyst in one
+        request. Rows are ordered by ledger ascending, then event id, and the
+        file is deterministic for an unchanged store.
+
+        Unlike the JSON listing there is no cursor and no row cap: an export is
+        meant to be complete. The same `type`, `from` and `to` filters apply,
+        but `topic` and `in_successful_call` are not supported here.
+
+        The header row is always present, so an unknown contract yields a
+        file with no data rows rather than a 404. Free-text columns are
+        prefixed with an apostrophe when they start with a character a
+        spreadsheet would treat as a formula.
+      operationId: exportContractEventsCSV
+      security:
+        - ApiKeyAuth: [read:contracts]
+      parameters:
+        - $ref: "#/components/parameters/ContractID"
+        - $ref: "#/components/parameters/NetworkParam"
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Event type filter.
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+          description: Lower ledger bound (inclusive). Must not exceed `to`.
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+          description: Upper ledger bound (inclusive). Must not be below `from`.
+      responses:
+        "200":
+          description: >
+            CSV export of matching contract events, served as a downloadable
+            attachment with `Content-Type: text/csv; charset=utf-8` and
+            `Content-Disposition: attachment; filename="<id>-events.csv"`.
+            The columns are id, contract_id, network, ledger,
+            ledger_closed_at, tx_hash, type, topic_xdr, value_xdr,
+            topic_decoded, value_decoded, in_successful_call.
+          content:
+            text/csv:
+              schema:
+                type: string
+        "422":
+          $ref: "#/components/responses/InvalidInput"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/contracts/{id}/invocations:
     get:
       tags: [Invocations]

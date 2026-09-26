@@ -49,6 +49,7 @@ from .error_error_type_0 import ErrorErrorType0
 from .error_error_type_0_code import ErrorErrorType0Code
 from .error_error_type_1 import ErrorErrorType1
 from .event import Event
+from .export_contract_events_csv_network import ExportContractEventsCsvNetwork
 from .failed_event import FailedEvent
 from .failed_event_event import FailedEventEvent
 from .forecast_point import ForecastPoint
@@ -237,6 +238,7 @@ __all__ = (
     "ErrorErrorType0Code",
     "ErrorErrorType1",
     "Event",
+    "ExportContractEventsCsvNetwork",
     "FailedEvent",
     "FailedEventEvent",
     "ForecastPoint",

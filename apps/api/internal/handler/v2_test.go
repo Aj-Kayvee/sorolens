@@ -278,6 +278,10 @@ func TestV2CoversEveryV1Route(t *testing.T) {
 		"GET /api/v1/reports/{contract_id}":           true,
 		"GET /api/v1/reports/{contract_id}/history":   true,
 		"GET /api/v1/reports/{contract_id}/badge.svg": true,
+		// CSV export (#160): a bulk download over the same data as the v1
+		// event listing. v2 exposes the JSON listing; the flat file follows
+		// when the export is ported.
+		"GET /api/v1/contracts/{id}/events.csv":        true,
 	}
 
 	var missing []string
