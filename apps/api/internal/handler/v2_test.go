@@ -288,6 +288,10 @@ func TestV2CoversEveryV1Route(t *testing.T) {
 		// Contract tags (issue #459): contributor-scoped writes with no v2 twin.
 		"POST /api/v1/contracts/{id}/tags":            true,
 		"DELETE /api/v1/contracts/{id}/tags/{tag}":    true,
+		// Wasm binary download (#162): raw application/wasm bytes, not a JSON
+		// document, so it has no meaning under the v2 envelope. The v2
+		// contract surface keeps its JSON twins only.
+		"GET /api/v1/contracts/{id}/wasm":             true,
 	}
 
 	var missing []string

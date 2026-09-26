@@ -30,6 +30,7 @@ type FullStore interface {
 	WatchlistStore
 	UserStore
 	PerformanceStore
+	ContractWasmStore
 	GlobalEventStore
 	LabelStore
 	FailedEventStore
