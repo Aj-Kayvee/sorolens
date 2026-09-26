@@ -31,6 +31,7 @@ type MockStore struct {
 	failedEvents       map[int64]FailedEvent
 	failedEventSeq     int64
 	indexerCursors     map[string]uint32
+	contractSpecs      map[string]ContractSpec
 	contractVersions   map[string][]ContractVersion
 	alertGroups        []AlertGroup
 	labels             []Label
@@ -55,10 +56,12 @@ type MockStore struct {
 	RecordContractVersionErr    error
 	ListContractVersionsErr     error
 	GetLatestContractVersionErr error
-	InsertFailedEventErr error
-	ListFailedEventsErr  error
-	GetFailedEventErr    error
-	DeleteFailedEventErr error
+	UpsertContractSpecErr       error
+	GetContractSpecErr          error
+	InsertFailedEventErr        error
+	ListFailedEventsErr         error
+	GetFailedEventErr           error
+	DeleteFailedEventErr        error
 }
 
 func (m *MockStore) UpsertLabel(_ context.Context, label Label) error {
@@ -97,6 +100,7 @@ func NewMockStore() *MockStore {
 		alertSubscriptions: make([]AlertSubscription, 0),
 		users:              make(map[string]User),
 		indexerCursors:     make(map[string]uint32),
+		contractSpecs:      make(map[string]ContractSpec),
 		contractVersions:   make(map[string][]ContractVersion),
 	}
 }
@@ -1006,7 +1010,6 @@ func (m *MockStore) GetLatestContractVersion(_ context.Context, contractID strin
 	}
 	return latest, nil
 }
-
 func (m *MockStore) SearchContracts(_ context.Context, query string, limit int) ([]Contract, error) {
 	if query == "" {
 		return []Contract{}, nil

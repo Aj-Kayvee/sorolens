@@ -177,6 +177,13 @@ func New(h *handler.Handler, maxBodyBytes int64) http.Handler {
 		get("/contracts/{id}/summary", h.ContractSummary)
 		get("/contracts/{id}/stream", h.StreamEvents)
 		get("/contracts/{id}/graph", h.ContractGraph)
+		get("/contracts/{id}/spec", h.GetContractSpec)
+
+		// User-defined contract tags (issue #459). Wrapped by the contributor
+		// role so an anonymous caller cannot label a contract even though the
+		// write scope passes on the public surface.
+		r.With(scope, contributor).Post("/contracts/{id}/tags", h.AddContractTag)
+		r.With(scope, contributor).Delete("/contracts/{id}/tags/{tag}", h.RemoveContractTag)
 		// Dead-letter queue for events that failed processing (issue #202).
 		get("/dlq", h.ListFailedEvents)
 		r.With(scope, contributor).Post("/dlq/{id}/requeue", h.RequeueFailedEvent)

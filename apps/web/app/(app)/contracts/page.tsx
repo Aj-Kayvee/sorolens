@@ -10,6 +10,7 @@ import type { ContractSummary } from "@/lib/types";
 import { networkFilter, useNetwork } from "@/lib/network";
 import { contractRowKey, isPendingRow } from "@/lib/optimisticTrack";
 import type { ContractRow } from "@/lib/optimisticTrack";
+import { getUserId } from "@/lib/user";
 import { TableSkeleton } from "@/components/Skeleton";
 import ImportContractsCsv from "@/components/ImportContractsCsv";
 
@@ -122,6 +123,7 @@ const COLUMNS: Column<ContractRow>[] = [
       </span>
     ),
   },
+
   {
     key: "last_activity_at",
     header: "Last activity",
@@ -134,10 +136,48 @@ const COLUMNS: Column<ContractRow>[] = [
   },
 ];
 
+/**
+ * The base columns plus a Tags column whose chips feed the server-side tag
+ * filter. Built per render rather than declared as a constant because the chips
+ * need the click handler; the handler only calls `setTagFilter`, which is
+ * stable, so `useMemo(..., [])` around the result stays correct.
+ */
+function makeColumns(onTagClick: (tag: string) => void): Column<ContractRow>[] {
+  const tagsColumn: Column<ContractRow> = {
+    key: "tags",
+    header: "Tags",
+    accessor: (c) =>
+      c.tags && c.tags.length > 0 ? (
+        <span className="flex flex-wrap gap-1">
+          {c.tags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => onTagClick(tag)}
+              className="rounded-full bg-[var(--color-bg-card)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+            >
+              {tag}
+            </button>
+          ))}
+        </span>
+      ) : (
+        <span className="text-xs text-[var(--color-text-secondary)]">—</span>
+      ),
+  };
+
+  // Sits after Status: the tags read as part of how a contract is identified,
+  // before the date columns.
+  const statusIndex = COLUMNS.findIndex((column) => column.key === "status");
+  return [
+    ...COLUMNS.slice(0, statusIndex + 1),
+    tagsColumn,
+    ...COLUMNS.slice(statusIndex + 1),
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
-
 export default function ContractsPage() {
   // Selected network from the header selector.
   const { network } = useNetwork();
@@ -204,7 +244,7 @@ export default function ContractsPage() {
         if (seq === loadSeq.current) setLoading(false);
       }
     },
-    [network]
+    [network, tagFilter]
   );
 
   useEffect(() => {
@@ -399,7 +439,7 @@ export default function ContractsPage() {
         {/* Data table */}
         {!loading && sorted.length > 0 && (
           <DataTable<ContractRow>
-            columns={COLUMNS}
+            columns={columns}
             data={sorted}
             rowKey={contractRowKey}
             sortColumn={sortColumn}

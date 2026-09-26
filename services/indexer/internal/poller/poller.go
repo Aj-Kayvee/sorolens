@@ -484,6 +484,11 @@ func (p *Poller) processContract(ctx context.Context, contract Contract) error {
 		)
 	}
 
+	// Cache the contract's SEP-48 interface spec on first index (issue #130).
+	// Best-effort: every failure mode logs a warning inside, so this never
+	// blocks event indexing.
+	p.cacheContractSpec(ctx, rpc, contract)
+
 	latest, err := rpc.GetLatestLedger(ctx)
 	if err != nil {
 		return fmt.Errorf("get latest ledger: %w", err)

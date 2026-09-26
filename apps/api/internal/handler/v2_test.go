@@ -282,6 +282,12 @@ func TestV2CoversEveryV1Route(t *testing.T) {
 		// event listing. v2 exposes the JSON listing; the flat file follows
 		// when the export is ported.
 		"GET /api/v1/contracts/{id}/events.csv":        true,
+		// SEP-48 interface spec (issue #134): an additive read over cached
+		// Wasm metadata with no v2 counterpart.
+		"GET /api/v1/contracts/{id}/spec":             true,
+		// Contract tags (issue #459): contributor-scoped writes with no v2 twin.
+		"POST /api/v1/contracts/{id}/tags":            true,
+		"DELETE /api/v1/contracts/{id}/tags/{tag}":    true,
 	}
 
 	var missing []string

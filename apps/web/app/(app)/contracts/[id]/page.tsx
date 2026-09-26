@@ -24,6 +24,7 @@ import type {
 } from "@/lib/types";
 import { getUserId } from "@/lib/user";
 import { StatCard } from "@/components/StatCard";
+import { TagInput } from "@/components/TagInput";
 import {
   CardSkeleton,
   ChartSkeleton,
@@ -257,13 +258,13 @@ function ContractDetailContent({ id }: { id: string }) {
         setTagError(
           err instanceof ApiError && err.status === 401
             ? "You need a contributor identity to edit tags."
-            : "Failed to add tag.",
+            : "Failed to add tag."
         );
       } finally {
         setTagSaving(false);
       }
     },
-    [id],
+    [id]
   );
 
   const handleRemoveTag = useCallback(
@@ -277,13 +278,13 @@ function ContractDetailContent({ id }: { id: string }) {
         setTagError(
           err instanceof ApiError && err.status === 401
             ? "You need a contributor identity to edit tags."
-            : "Failed to remove tag.",
+            : "Failed to remove tag."
         );
       } finally {
         setTagSaving(false);
       }
     },
-    [id],
+    [id]
   );
 
   if (contractLoading) {
