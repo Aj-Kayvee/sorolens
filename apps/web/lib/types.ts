@@ -168,7 +168,7 @@ export interface BatchContractsRequest {
 export interface BatchContractsResponse {
   action: BatchContractsAction;
   requested: number;
-  affected: number
+  affected: number;
 }
 
 export interface TrackContractRequest {

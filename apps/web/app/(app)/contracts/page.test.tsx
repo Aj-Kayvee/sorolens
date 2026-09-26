@@ -125,7 +125,7 @@ vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {
     constructor(
       public status: number,
-      message: string,
+      message: string
     ) {
       super(message);
       this.name = "ApiError";
@@ -350,11 +350,11 @@ describe("ContractsPage", () => {
 
     expect(
       (screen.getByTestId(`select-${CONTRACT_A.id}`) as HTMLInputElement)
-        .checked,
+        .checked
     ).toBe(true);
     expect(
       (screen.getByTestId(`select-${CONTRACT_B.id}`) as HTMLInputElement)
-        .checked,
+        .checked
     ).toBe(true);
     expect(screen.getByText(/2 selected/i)).toBeDefined();
   });
@@ -392,13 +392,13 @@ describe("ContractsPage", () => {
     await waitFor(() => expect(mockBatchContracts).toHaveBeenCalledTimes(1));
     expect(mockBatchContracts).toHaveBeenCalledWith(
       { ids: [CONTRACT_A.id], action: "untrack", args: undefined },
-      "",
+      ""
     );
 
     // Modal closes, selection clears and the list refetches without A.
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() =>
-      expect(screen.queryByTestId(`select-${CONTRACT_A.id}`)).toBeNull(),
+      expect(screen.queryByTestId(`select-${CONTRACT_A.id}`)).toBeNull()
     );
     expect(document.getElementById("bulk-toolbar")).toBeNull();
     expect(mockListContracts).toHaveBeenCalledTimes(2);
@@ -435,7 +435,7 @@ describe("ContractsPage", () => {
       target: { value: "payments" },
     });
     fireEvent.submit(
-      document.getElementById("tag-submit-btn")!.closest("form")!,
+      document.getElementById("tag-submit-btn")!.closest("form")!
     );
 
     await waitFor(() => expect(mockBatchContracts).toHaveBeenCalledTimes(1));
@@ -443,9 +443,7 @@ describe("ContractsPage", () => {
     expect(userId).toBe("");
     expect(req.action).toBe("tag");
     expect(req.args).toEqual({ label: "payments" });
-    expect([...req.ids].sort()).toEqual(
-      [CONTRACT_A.id, CONTRACT_B.id].sort(),
-    );
+    expect([...req.ids].sort()).toEqual([CONTRACT_A.id, CONTRACT_B.id].sort());
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(mockListContracts).toHaveBeenCalledTimes(2));

@@ -145,7 +145,7 @@ export function trackContract(
 // can require the contributor role.
 export function batchContracts(
   req: BatchContractsRequest,
-  userId?: string,
+  userId?: string
 ): Promise<BatchContractsResponse> {
   const headers: Record<string, string> = {};
   if (userId) headers["X-User-ID"] = userId;
@@ -155,7 +155,7 @@ export function batchContracts(
       method: "POST",
       body: JSON.stringify(req),
       headers,
-    },
+    }
   );
 }
 

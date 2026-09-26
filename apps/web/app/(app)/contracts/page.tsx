@@ -164,8 +164,8 @@ function UntrackConfirmModal({
         <span className="font-medium text-[var(--color-text-primary)]">
           {count} {count === 1 ? "contract" : "contracts"}
         </span>{" "}
-        and all of their indexed events, invocations and storage snapshots.
-        This cannot be undone.
+        and all of their indexed events, invocations and storage snapshots. This
+        cannot be undone.
       </p>
       <div className="mt-6 flex gap-3">
         <button
@@ -512,7 +512,7 @@ export default function ContractsPage() {
   // clears the selection. Errors surface as a toast rather than being swallowed.
   const runBulkAction = async (
     action: BatchContractsAction,
-    label?: string,
+    label?: string
   ) => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
@@ -520,7 +520,7 @@ export default function ContractsPage() {
     try {
       const res = await batchContracts(
         { ids, action, args: label ? { label } : undefined },
-        getUserId(),
+        getUserId()
       );
       const noun = res.affected === 1 ? "contract" : "contracts";
       setToast({
