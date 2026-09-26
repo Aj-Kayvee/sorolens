@@ -183,7 +183,6 @@ var contractSortColumns = map[string]string{
 func ValidContractSort(col string) bool {
 	return contractSortColumns[col] != ""
 }
-}
 
 // NewStore returns a Store backed by the given pgxpool.Pool.
 func NewStore(pool *pgxpool.Pool) Store {

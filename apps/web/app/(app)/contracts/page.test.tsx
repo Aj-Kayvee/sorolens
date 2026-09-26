@@ -41,9 +41,7 @@ vi.mock("next/link", () => ({
 const nav = vi.hoisted(() => {
   let query = new URLSearchParams("");
   const replace = vi.fn((href: string) => {
-    query = new URLSearchParams(
-      href.startsWith("?") ? href.slice(1) : href,
-    );
+    query = new URLSearchParams(href.startsWith("?") ? href.slice(1) : href);
   });
   const push = vi.fn();
   return {
@@ -454,8 +452,8 @@ describe("ContractsPage", () => {
     // The page refetches with the new sort against the API…
     await waitFor(() =>
       expect(mockListContracts).toHaveBeenCalledWith(
-        expect.objectContaining({ sort: "label", dir: "asc" }),
-      ),
+        expect.objectContaining({ sort: "label", dir: "asc" })
+      )
     );
     // …and the active sort is written to the URL so the view is shareable.
     expect(nav.replace).toHaveBeenCalledWith("?sort=label&dir=asc");
@@ -471,13 +469,13 @@ describe("ContractsPage", () => {
     // First click on the default column (added_at, desc) flips to asc.
     fireEvent.click(screen.getByTestId("col-added_at"));
     await waitFor(() =>
-      expect(nav.replace).toHaveBeenCalledWith("?sort=added_at&dir=asc"),
+      expect(nav.replace).toHaveBeenCalledWith("?sort=added_at&dir=asc")
     );
 
     // Second click flips back to desc.
     fireEvent.click(screen.getByTestId("col-added_at"));
     await waitFor(() =>
-      expect(nav.replace).toHaveBeenCalledWith("?sort=added_at&dir=desc"),
+      expect(nav.replace).toHaveBeenCalledWith("?sort=added_at&dir=desc")
     );
     expect(screen.getByText("▼")).toBeDefined();
   });
@@ -490,7 +488,7 @@ describe("ContractsPage", () => {
 
     // The first request already carries the URL sort params.
     expect(mockListContracts).toHaveBeenCalledWith(
-      expect.objectContaining({ sort: "status", dir: "asc" }),
+      expect.objectContaining({ sort: "status", dir: "asc" })
     );
     // A URL that already matches the state is not rewritten.
     expect(nav.replace).not.toHaveBeenCalled();

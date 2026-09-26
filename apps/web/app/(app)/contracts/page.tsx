@@ -1,6 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DataTable, Toast } from "@sorolens/ui";
@@ -123,6 +130,16 @@ const COLUMNS: Column<ContractRow>[] = [
     accessor: (c) => <StatusBadge status={c.status} />,
   },
   {
+    key: "label",
+    header: "Label",
+    sortable: true,
+    accessor: (c) => (
+      <span className="text-xs text-[var(--color-text-secondary)]">
+        {c.label}
+      </span>
+    ),
+  },
+  {
     key: "added_at",
     header: "Added",
     sortable: true,
@@ -208,13 +225,10 @@ function ContractsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [sortColumn, setSortColumn] = useState<string>(
-    () => searchParams?.get(SORT_PARAM) ?? DEFAULT_SORT_COLUMN,
+    () => searchParams?.get(SORT_PARAM) ?? DEFAULT_SORT_COLUMN
   );
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
-    () =>
-      searchParams?.get(DIR_PARAM) === "asc"
-        ? "asc"
-        : DEFAULT_SORT_DIRECTION,
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(() =>
+    searchParams?.get(DIR_PARAM) === "asc" ? "asc" : DEFAULT_SORT_DIRECTION
   );
 
   // Data state
@@ -277,7 +291,7 @@ function ContractsPageInner() {
         if (seq === loadSeq.current) setLoading(false);
       }
     },
-    [network, tagFilter, sortColumn, sortDirection],
+    [network, tagFilter, sortColumn, sortDirection]
   );
 
   useEffect(() => {
@@ -317,8 +331,7 @@ function ContractsPageInner() {
   // params does not rewrite the URL on mount.
   useEffect(() => {
     const params = new URLSearchParams(searchParams?.toString() ?? "");
-    const current =
-      params.get(SORT_PARAM) ?? DEFAULT_SORT_COLUMN;
+    const current = params.get(SORT_PARAM) ?? DEFAULT_SORT_COLUMN;
     const currentDir =
       params.get(DIR_PARAM) === "asc" ? "asc" : DEFAULT_SORT_DIRECTION;
     if (current === sortColumn && currentDir === sortDirection) return;
