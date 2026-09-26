@@ -10,6 +10,11 @@ from .api_health_response_200 import ApiHealthResponse200
 from .api_health_response_200_db import ApiHealthResponse200Db
 from .api_health_response_200_redis import ApiHealthResponse200Redis
 from .api_key import APIKey
+from .batch_contracts_request import BatchContractsRequest
+from .batch_contracts_request_action import BatchContractsRequestAction
+from .batch_contracts_request_args import BatchContractsRequestArgs
+from .batch_contracts_result import BatchContractsResult
+from .batch_contracts_result_action import BatchContractsResultAction
 from .build_info import BuildInfo
 from .compare_contract_entry import CompareContractEntry
 from .compare_contract_entry_event_volume_item import (
@@ -210,6 +215,11 @@ __all__ = (
     "ApiHealthResponse200",
     "ApiHealthResponse200Db",
     "ApiHealthResponse200Redis",
+    "BatchContractsRequest",
+    "BatchContractsRequestAction",
+    "BatchContractsRequestArgs",
+    "BatchContractsResult",
+    "BatchContractsResultAction",
     "BuildInfo",
     "CompareContractEntry",
     "CompareContractEntryEventVolumeItem",

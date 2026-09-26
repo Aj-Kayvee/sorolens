@@ -16,6 +16,7 @@ import (
 // the postgres backend and the in-memory MockStore.
 type FullStore interface {
 	Store
+	ContractBulkStore
 	QueryStore
 	LiveStore
 	ArchiveStore

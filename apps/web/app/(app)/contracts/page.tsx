@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { DataTable, Toast } from "@sorolens/ui";
 import type { Column } from "@sorolens/ui";
 import { LabelledId } from "@/components/LabelledId";
-import { listContracts } from "@/lib/api";
-import type { ContractSummary } from "@/lib/types";
+import { ApiError, batchContracts, listContracts } from "@/lib/api";
+import type { BatchContractsAction } from "@/lib/types";
 import { networkFilter, useNetwork } from "@/lib/network";
 import { contractRowKey, isPendingRow } from "@/lib/optimisticTrack";
 import type { ContractRow } from "@/lib/optimisticTrack";
@@ -78,6 +79,181 @@ function RelativeTime({ iso }: { iso: string | null }) {
   }
 
   return <span>{formatRelativeTime(iso)}</span>;
+}
+
+// ---------------------------------------------------------------------------
+// Bulk action modals (#176)
+// ---------------------------------------------------------------------------
+
+/** Shared modal chrome: backdrop click and Escape both close the dialog. */
+function ModalShell({
+  titleId,
+  title,
+  onClose,
+  children,
+}: {
+  titleId: string;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={backdropRef}
+      onClick={(e) => {
+        if (e.target === backdropRef.current) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby={titleId}
+    >
+      <div className="w-full max-w-md rounded-xl bg-[var(--color-bg-card)] p-6 shadow-2xl border border-[var(--color-border)]">
+        <div className="mb-5 flex items-center justify-between">
+          <h2
+            id={titleId}
+            className="text-lg font-semibold text-[var(--color-text-primary)]"
+          >
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+            aria-label="Close modal"
+          >
+            ✕
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Confirmation for the destructive "untrack" bulk action. */
+function UntrackConfirmModal({
+  count,
+  pending,
+  onClose,
+  onConfirm,
+}: {
+  count: number;
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <ModalShell
+      titleId="untrack-modal-title"
+      title="Untrack contracts?"
+      onClose={onClose}
+    >
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        This permanently removes{" "}
+        <span className="font-medium text-[var(--color-text-primary)]">
+          {count} {count === 1 ? "contract" : "contracts"}
+        </span>{" "}
+        and all of their indexed events, invocations and storage snapshots. This
+        cannot be undone.
+      </p>
+      <div className="mt-6 flex gap-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 rounded-lg border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          id="untrack-confirm-btn"
+          type="button"
+          onClick={onConfirm}
+          disabled={pending}
+          className="flex-1 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {pending ? "Untracking…" : `Untrack ${count}`}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+/** Collects the tag for the bulk "tag" action. */
+function TagModal({
+  count,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  count: number;
+  pending: boolean;
+  onClose: () => void;
+  onSubmit: (label: string) => void;
+}) {
+  const [label, setLabel] = useState("");
+  const trimmed = label.trim();
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!trimmed) return;
+    onSubmit(trimmed);
+  };
+
+  return (
+    <ModalShell titleId="tag-modal-title" title="Add tag" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          Applies one tag to {count} selected{" "}
+          {count === 1 ? "contract" : "contracts"}, replacing any existing
+          alias.
+        </p>
+        <div>
+          <label
+            htmlFor="tag-input"
+            className="mb-1.5 block text-sm font-medium text-[var(--color-text-secondary)]"
+          >
+            Tag
+          </label>
+          <input
+            id="tag-input"
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="payments"
+            className="w-full rounded-lg border border-[var(--color-border)] bg-black/30 px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-accent)] focus:outline-none"
+          />
+        </div>
+        <div className="flex gap-3 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            id="tag-submit-btn"
+            type="submit"
+            disabled={!trimmed || pending}
+            className="flex-1 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--color-bg-page)] transition-opacity disabled:opacity-50 hover:opacity-90"
+          >
+            {pending ? "Applying…" : "Apply tag"}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -204,11 +380,20 @@ export default function ContractsPage() {
   // CSV import state
   const [showImport, setShowImport] = useState(false);
 
+  // Bulk selection state (#176): ids of the currently checked contracts.
+  // Pending (optimistic) rows are not selectable.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showUntrackModal, setShowUntrackModal] = useState(false);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [bulkPending, setBulkPending] = useState(false);
+
   // Track state: one request in flight at a time, errors surface as a toast.
   const [trackPending, setTrackPending] = useState(false);
-  const [toast, setToast] = useState<{ id: number; message: string } | null>(
-    null
-  );
+  const [toast, setToast] = useState<{
+    id: number;
+    message: string;
+    variant: "info" | "success" | "error";
+  } | null>(null);
   const toastSeq = useRef(0);
   const dismissToast = useCallback(() => setToast(null), []);
 
@@ -297,6 +482,76 @@ export default function ContractsPage() {
   };
 
   // ---------------------------------------------------------------------------
+  // Bulk selection + actions (#176)
+  // ---------------------------------------------------------------------------
+
+  const toggleRow = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback((ids: string[]) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const allSelected = ids.length > 0 && ids.every((id) => next.has(id));
+      for (const id of ids) {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+
+  // runBulkAction calls the batch endpoint, then refreshes the current page and
+  // clears the selection. Errors surface as a toast rather than being swallowed.
+  const runBulkAction = async (
+    action: BatchContractsAction,
+    label?: string
+  ) => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setBulkPending(true);
+    try {
+      const res = await batchContracts(
+        { ids, action, args: label ? { label } : undefined },
+        getUserId()
+      );
+      const noun = res.affected === 1 ? "contract" : "contracts";
+      setToast({
+        id: ++toastSeq.current,
+        variant: "success",
+        message:
+          action === "untrack"
+            ? `Untracked ${res.affected} ${noun}.`
+            : `Tagged ${res.affected} ${noun} as “${label}”.`,
+      });
+      clearSelection();
+      setShowUntrackModal(false);
+      setShowTagModal(false);
+      // The list changed, so reload the page the user is looking at.
+      load(cursors[cursorIndex]);
+    } catch (err) {
+      const detail = err instanceof ApiError ? err.message : "";
+      const verb = action === "untrack" ? "untrack" : "tag";
+      setToast({
+        id: ++toastSeq.current,
+        variant: "error",
+        message: detail
+          ? `Couldn't ${verb} contracts: ${detail}`
+          : `Couldn't ${verb} contracts. Please try again.`,
+      });
+    } finally {
+      setBulkPending(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
   // Derived: filtered + sorted data (client-side for current page)
   // ---------------------------------------------------------------------------
 
@@ -330,8 +585,41 @@ export default function ContractsPage() {
     setCursorIndex(0);
   };
 
-  // Columns depend on the tag-click handler so a tag chip can set the filter.
-  const columns = useMemo(() => makeColumns((tag) => setTagFilter(tag)), []);
+  // Selectable ids on the current page: pending (optimistic) rows are skipped.
+  const pageIds = sorted.filter((c) => !isPendingRow(c)).map((c) => c.id);
+  const allSelected =
+    pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+
+  // Columns depend on the tag-click handler so a tag chip can set the filter,
+  // and lead with a selection column whose header checkbox toggles every
+  // selectable row on the current page.
+  const columns = useMemo(() => {
+    const selectColumn: Column<ContractRow> = {
+      key: "select",
+      header: (
+        <input
+          type="checkbox"
+          data-testid="select-all"
+          aria-label="Select all contracts on this page"
+          checked={allSelected}
+          onChange={() => toggleAll(pageIds)}
+        />
+      ),
+      accessor: (c) => (
+        <input
+          type="checkbox"
+          data-testid={`select-${c.id}`}
+          aria-label={`Select contract ${c.id}`}
+          checked={selected.has(c.id)}
+          disabled={isPendingRow(c)}
+          // Keep the checkbox from triggering the row's navigate-on-click.
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => toggleRow(c.id)}
+        />
+      ),
+    };
+    return [selectColumn, ...makeColumns((tag) => setTagFilter(tag))];
+  }, [allSelected, pageIds, selected, toggleAll, toggleRow]);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -348,11 +636,29 @@ export default function ContractsPage() {
         />
       )}
 
+      {showUntrackModal && (
+        <UntrackConfirmModal
+          count={selected.size}
+          pending={bulkPending}
+          onClose={() => setShowUntrackModal(false)}
+          onConfirm={() => runBulkAction("untrack")}
+        />
+      )}
+
+      {showTagModal && (
+        <TagModal
+          count={selected.size}
+          pending={bulkPending}
+          onClose={() => setShowTagModal(false)}
+          onSubmit={(label) => runBulkAction("tag", label)}
+        />
+      )}
+
       {toast && (
         <Toast
           key={toast.id}
           message={toast.message}
-          variant="error"
+          variant={toast.variant}
           onDismiss={dismissToast}
         />
       )}
@@ -408,6 +714,48 @@ export default function ContractsPage() {
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-2.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-accent)] focus:outline-none sm:max-w-xs"
           />
         </div>
+
+        {/* Bulk actions toolbar: shown only while a selection exists (#176) */}
+        {selected.size > 0 && (
+          <div
+            id="bulk-toolbar"
+            className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3"
+          >
+            <span className="text-sm text-[var(--color-text-secondary)]">
+              {selected.size} selected
+            </span>
+            <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+              <button
+                id="bulk-tag-btn"
+                type="button"
+                onClick={() => setShowTagModal(true)}
+                disabled={bulkPending}
+                className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] hover:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Add tag
+              </button>
+              <button
+                id="bulk-untrack-btn"
+                type="button"
+                onClick={() => setShowUntrackModal(true)}
+                disabled={bulkPending}
+                className="rounded-lg border border-red-500/40 bg-red-600/10 px-3 py-1.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-600/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Untrack {selected.size}{" "}
+                {selected.size === 1 ? "contract" : "contracts"}
+              </button>
+              <button
+                id="bulk-clear-btn"
+                type="button"
+                onClick={clearSelection}
+                disabled={bulkPending}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] disabled:opacity-50"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Loading skeleton */}
         {loading && <TableSkeleton rows={PAGE_SIZE} />}
